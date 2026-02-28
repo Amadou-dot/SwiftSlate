@@ -138,44 +138,63 @@ class AssistantService : AccessibilityService() {
             var spinnerJob: Job? = null
             try {
                 withTimeout(90_000) {
-                    val key = keyManager.getNextKey()
-                    if (key == null) {
-                        replaceText(source, originalText)
-                        performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        val waitMs = keyManager.getShortestWaitTimeMs()
-                        if (waitMs != null) {
-                            val waitSec = ((waitMs + 999) / 1000).coerceAtLeast(1)
-                            showToast("API key rate limited. Try again in ${waitSec}s")
-                        } else if (keyManager.getKeys().isEmpty()) {
-                            showToast("No API keys configured")
-                        } else {
-                            showToast("All API keys are invalid. Please check your keys")
+                    val maxAttempts = keyManager.getKeys().size.coerceAtLeast(1)
+                    var lastErrorMsg: String? = null
+                    var succeeded = false
+
+                    for (attempt in 0 until maxAttempts) {
+                        val key = keyManager.getNextKey()
+                        if (key == null) break
+
+                        if (spinnerJob == null) {
+                            spinnerJob = startInlineSpinner(source, originalText)
                         }
-                        return@withTimeout
-                    }
 
-                    spinnerJob = startInlineSpinner(source, originalText)
+                        val result = client.generate(command.prompt, text, key, model, temperature)
 
-                    val result = client.generate(command.prompt, text, key, model, temperature)
+                        if (result.isSuccess) {
+                            spinnerJob?.cancel()
+                            spinnerJob = null
+                            lastOriginalText = originalText
+                            replaceText(source, result.getOrThrow())
+                            performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            succeeded = true
+                            break
+                        }
 
-                    spinnerJob.cancel()
-                    spinnerJob = null
+                        val msg = result.exceptionOrNull()?.message ?: ""
+                        lastErrorMsg = msg
+                        val isRateLimit = msg.contains("Rate limit") || msg.contains("rate limit")
+                        val isInvalidKey = msg.contains("Invalid API key", ignoreCase = true) || msg.contains("API key not valid", ignoreCase = true)
 
-                    result.onSuccess { generatedText ->
-                        lastOriginalText = originalText
-                        replaceText(source, generatedText)
-                        performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                    }.onFailure { err ->
-                        replaceText(source, originalText)
-                        performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        val msg = err.message ?: ""
-                        if (msg.contains("Rate limit") || msg.contains("rate limit")) {
+                        if (isRateLimit) {
                             val seconds = Regex("retry after (\\d+)s").find(msg)?.groupValues?.get(1)?.toLongOrNull() ?: 60
                             keyManager.reportRateLimit(key, seconds)
-                        } else if (msg.contains("Invalid API key", ignoreCase = true) || msg.contains("API key not valid", ignoreCase = true)) {
+                        } else if (isInvalidKey) {
                             keyManager.markInvalid(key)
+                        } else {
+                            break // Non-retryable error, stop trying other keys
                         }
-                        showToast("TypeSlate Error: $msg")
+                    }
+
+                    if (!succeeded) {
+                        spinnerJob?.cancel()
+                        spinnerJob = null
+                        replaceText(source, originalText)
+                        performHapticFeedback(HapticFeedbackConstants.REJECT)
+                        if (lastErrorMsg != null) {
+                            showToast("TypeSlate Error: $lastErrorMsg")
+                        } else {
+                            val waitMs = keyManager.getShortestWaitTimeMs()
+                            if (waitMs != null) {
+                                val waitSec = ((waitMs + 999) / 1000).coerceAtLeast(1)
+                                showToast("API key rate limited. Try again in ${waitSec}s")
+                            } else if (keyManager.getKeys().isEmpty()) {
+                                showToast("No API keys configured")
+                            } else {
+                                showToast("All API keys are invalid. Please check your keys")
+                            }
+                        }
                     }
                 }
             } catch (e: TimeoutCancellationException) {
