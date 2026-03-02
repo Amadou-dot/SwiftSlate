@@ -134,12 +134,12 @@ class AssistantService : AccessibilityService() {
         val prefs = applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
         val providerType = prefs.getString("provider_type", "gemini") ?: "gemini"
         val model: String
-        val customEndpoint: String?
+        val endpoint: String
 
         if (providerType == "custom") {
             model = prefs.getString("custom_model", "") ?: ""
-            customEndpoint = prefs.getString("custom_endpoint", "") ?: ""
-            if (model.isBlank() || customEndpoint.isBlank()) {
+            endpoint = prefs.getString("custom_endpoint", "") ?: ""
+            if (model.isBlank() || endpoint.isBlank()) {
                 serviceScope.launch {
                     showToast("Custom provider not configured. Set endpoint and model in Settings.")
                 }
@@ -148,7 +148,7 @@ class AssistantService : AccessibilityService() {
             }
         } else {
             model = prefs.getString("model", "gemini-2.5-flash-lite") ?: "gemini-2.5-flash-lite"
-            customEndpoint = null
+            endpoint = ""
         }
         val temperature = DEFAULT_TEMPERATURE
 
@@ -170,7 +170,7 @@ class AssistantService : AccessibilityService() {
                         }
 
                         val result = if (providerType == "custom") {
-                            openAIClient.generate(command.prompt, text, key, model, temperature, customEndpoint!!)
+                            openAIClient.generate(command.prompt, text, key, model, temperature, endpoint)
                         } else {
                             client.generate(command.prompt, text, key, model, temperature)
                         }
