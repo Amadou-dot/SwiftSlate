@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.manager.KeyManager
 import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SlateCard
@@ -36,8 +37,10 @@ fun DashboardScreen() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val keyManager = remember { KeyManager(context) }
+    val commandManager = remember { CommandManager(context) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
     var keyCount by remember { mutableIntStateOf(keyManager.getKeys().size) }
+    var currentPrefix by remember { mutableStateOf(commandManager.getTriggerPrefix()) }
 
     // Use the Activity lifecycle so polling only restarts when the app returns
     // from the background, not when switching between navbar tabs.
@@ -49,6 +52,7 @@ fun DashboardScreen() {
             while (true) {
                 isServiceEnabled = checkServiceEnabled(context)
                 keyCount = keyManager.getKeys().size
+                currentPrefix = commandManager.getTriggerPrefix()
                 delay(3000)
             }
         }
@@ -128,10 +132,7 @@ fun DashboardScreen() {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = """1. Enable the Accessibility Service.
-2. Add at least one API key.
-3. Type anywhere in Android, ending with a trigger like '?fix' or '?casual'.
-4. Wait a moment for the text to be magically replaced!""".trimIndent(),
+                text = "1. Enable the Accessibility Service.\n2. Add at least one API key.\n3. Type anywhere in Android, ending with a trigger like '${currentPrefix}fix' or '${currentPrefix}casual'.\n4. Wait a moment for the text to be magically replaced!",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 16.sp,
                 lineHeight = 22.sp

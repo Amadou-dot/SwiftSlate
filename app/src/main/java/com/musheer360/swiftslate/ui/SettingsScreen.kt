@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SlateCard
 
@@ -34,6 +35,11 @@ fun SettingsScreen() {
     // Custom provider settings
     var customEndpoint by remember { mutableStateOf(prefs.getString("custom_endpoint", "") ?: "") }
     var customModel by remember { mutableStateOf(prefs.getString("custom_model", "") ?: "") }
+
+    // Trigger prefix
+    val commandManager = remember { CommandManager(context) }
+    var triggerPrefix by remember { mutableStateOf(commandManager.getTriggerPrefix()) }
+    var prefixError by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -198,6 +204,56 @@ fun SettingsScreen() {
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SlateCard {
+            Text(
+                text = "Trigger Prefix",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Symbol used before command names (e.g., ${triggerPrefix}fix). Must be a single non-alphanumeric character.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = triggerPrefix,
+                onValueChange = { input ->
+                    val filtered = input.take(1)
+                    triggerPrefix = filtered
+                    prefixError = when {
+                        filtered.length != 1 -> "Must be exactly 1 character"
+                        filtered[0].isWhitespace() -> "Cannot be whitespace"
+                        filtered[0].isLetterOrDigit() -> "Cannot be a letter or digit"
+                        else -> {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            commandManager.setTriggerPrefix(filtered)
+                            null
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.width(80.dp),
+                isError = prefixError != null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
+            )
+            prefixError?.let { msg ->
+                Text(
+                    text = msg,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }

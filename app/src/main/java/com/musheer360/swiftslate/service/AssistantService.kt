@@ -56,6 +56,7 @@ class AssistantService : AccessibilityService() {
     private var isProcessing = false
     private val handler = Handler(Looper.getMainLooper())
     private var triggerLastChars = setOf<Char>()
+    private var cachedPrefix = CommandManager.DEFAULT_PREFIX
     private var currentJob: Job? = null
     @Volatile
     private var lastOriginalText: String? = null
@@ -89,6 +90,7 @@ class AssistantService : AccessibilityService() {
     }
 
     private fun updateTriggers() {
+        cachedPrefix = commandManager.getTriggerPrefix()
         val cmds = commandManager.getCommands()
         triggerLastChars = cmds.mapNotNull { it.trigger.lastOrNull() }.toSet()
         lastTriggerRefresh = System.currentTimeMillis()
@@ -106,7 +108,7 @@ class AssistantService : AccessibilityService() {
 
         val lastChar = text[text.length - 1]
         if (!triggerLastChars.contains(lastChar)) {
-            if (!lastChar.isLetterOrDigit() || !text.contains("?translate:")) {
+            if (!lastChar.isLetterOrDigit() || !text.contains("${cachedPrefix}translate:")) {
                 return
             }
         }
@@ -115,7 +117,7 @@ class AssistantService : AccessibilityService() {
 
         val cleanText = text.substring(0, text.length - command.trigger.length).trim()
 
-        if (command.trigger == "?undo") {
+        if (command.trigger.endsWith("undo") && command.isBuiltIn) {
             if (source.isPassword) { return }
             isProcessing = true
             currentJob?.cancel()

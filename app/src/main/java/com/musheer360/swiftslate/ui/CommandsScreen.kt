@@ -29,6 +29,7 @@ fun CommandsScreen() {
     var trigger by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val prefix = commandManager.getTriggerPrefix()
 
     Column(
         modifier = Modifier
@@ -52,7 +53,7 @@ fun CommandsScreen() {
                     trigger = it
                     errorMessage = null
                 },
-                label = { Text("Trigger (e.g., ?code)") },
+                label = { Text("Trigger (e.g., ${prefix}code)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -88,8 +89,8 @@ fun CommandsScreen() {
                     onClick = {
                         val trimmedTrigger = trigger.trim()
                         if (trimmedTrigger.isNotBlank() && prompt.isNotBlank()) {
-                            if (!trimmedTrigger.startsWith("?")) {
-                                errorMessage = "Trigger must start with '?'"
+                            if (!trimmedTrigger.startsWith(prefix)) {
+                                errorMessage = "Trigger must start with '$prefix'"
                                 return@Button
                             }
                             if (commands.any { it.trigger == trimmedTrigger }) {
