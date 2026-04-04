@@ -74,11 +74,12 @@ Pops from redo stack and returns the text. Returns null if stack is empty. Calle
 
 - Remove `lastOriginalText: String?` field
 - Add `private val undoManager = UndoManager()`
-- In `processCommand`, before the API call: `undoManager.pushState(fieldId, originalText)`
+- In `processCommand`, call `undoManager.pushState(fieldId, originalText)` **after** a successful API result (inside the `result.isSuccess` block, before `replaceText`). This ensures failed or timed-out transforms do not create undo entries or clear the redo stack.
+- Update the event-dispatch condition at line 130 (currently `command.trigger.endsWith("undo") && command.isBuiltIn`) to also match `?redo`: `(command.trigger.endsWith("undo") || command.trigger.endsWith("redo")) && command.isBuiltIn`
 - Replace `handleUndo` with `handleUndoRedo` that handles both `?undo` and `?redo`:
   - `?undo`: call `undoManager.undo(fieldId)`, push current text to redo, replace field text
   - `?redo`: call `undoManager.redo(fieldId)`, push current text to undo, replace field text
-- Error toasts: "Nothing to undo" / "Nothing to redo" with haptic reject on empty stack
+- On empty stack (undo/redo returns null): replace field text with `cleanText` (trigger already stripped) to remove the typed trigger from the input, then show toast "Nothing to undo" / "Nothing to redo" with haptic reject. This preserves current UX where the trigger text is always cleaned from the field.
 
 ## Changes to `CommandManager.kt`
 
@@ -98,7 +99,9 @@ Add to `builtInDefinitions`:
 
 ## Testing
 
-New test file: `app/src/test/java/com/musheer360/swiftslate/manager/UndoManagerTest.kt`
+### New: `UndoManagerTest.kt`
+
+File: `app/src/test/java/com/musheer360/swiftslate/manager/UndoManagerTest.kt`
 
 Test cases:
 - Push state and undo returns previous text
@@ -111,3 +114,8 @@ Test cases:
 - Undo on empty stack returns null
 - Redo on empty stack returns null
 - Field ID derivation with and without `viewIdResourceName`
+
+### Updated: `CommandManagerTest.kt`
+
+- Update `getCommands_returnsNineBuiltInByDefault` to assert 10 built-in commands (was 9)
+- Add test: `findCommand_withRedoTrigger_returnsRedoCommand` — verify `?redo` is found and marked as built-in
