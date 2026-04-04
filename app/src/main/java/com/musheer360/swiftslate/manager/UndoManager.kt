@@ -21,6 +21,7 @@ class UndoManager(
         return fields.getOrPut(fieldId) { FieldHistory() }
     }
 
+    /** Record a new transformation. Clears redo since a new transformation invalidates redo history. */
     fun pushState(fieldId: String, text: String) {
         val history = getOrCreate(fieldId)
         history.undoStack.addLast(text)
@@ -41,6 +42,7 @@ class UndoManager(
         history.redoStack.addLast(text)
     }
 
+    /** Push onto undo without clearing redo. Used during redo to make the current state undoable. */
     fun pushUndo(fieldId: String, text: String) {
         val history = getOrCreate(fieldId)
         history.undoStack.addLast(text)
