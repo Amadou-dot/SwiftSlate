@@ -25,3 +25,7 @@ local.properties
 app/build
 app/release
 release.keystore
+
+# Local improvement notes
+/improvements
+/docs/superpowers/*
