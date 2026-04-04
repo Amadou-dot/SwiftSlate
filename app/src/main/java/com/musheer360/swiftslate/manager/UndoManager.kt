@@ -1,5 +1,6 @@
 package com.musheer360.swiftslate.manager
 
+import android.view.accessibility.AccessibilityNodeInfo
 import java.util.ArrayDeque
 
 class UndoManager(
@@ -55,5 +56,17 @@ class UndoManager(
         val history = fields[fieldId] ?: return null
         if (history.redoStack.isEmpty()) return null
         return history.redoStack.removeLast()
+    }
+
+    // Note: node references can go stale when the user navigates away from
+    // a field. The field ID is derived at call time from a live node; if the
+    // node is stale, the ID may not match the original entry.
+    fun fieldId(node: AccessibilityNodeInfo): String {
+        val resName = node.viewIdResourceName
+        return if (resName != null) {
+            "${node.windowId}:$resName"
+        } else {
+            "${node.windowId}:${node.className}:${node.hashCode()}"
+        }
     }
 }

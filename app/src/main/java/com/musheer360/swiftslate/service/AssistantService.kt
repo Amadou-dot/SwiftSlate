@@ -29,6 +29,7 @@ import com.musheer360.swiftslate.api.GeminiClient
 import com.musheer360.swiftslate.api.OpenAICompatibleClient
 import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.manager.KeyManager
+import com.musheer360.swiftslate.manager.UndoManager
 import com.musheer360.swiftslate.model.Command
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -60,8 +61,7 @@ class AssistantService : AccessibilityService() {
     private var triggerLastChars = setOf<Char>()
     private var cachedPrefix = CommandManager.DEFAULT_PREFIX
     private var currentJob: Job? = null
-    @Volatile
-    private var lastOriginalText: String? = null
+    private val undoManager = UndoManager()
     private var lastTriggerRefresh = 0L
     private var currentOverlayToast: View? = null
     private var dismissRunnable: Runnable? = null
@@ -127,12 +127,13 @@ class AssistantService : AccessibilityService() {
 
         val cleanText = text.substring(0, text.length - command.trigger.length).trim()
 
-        if (command.trigger.endsWith("undo") && command.isBuiltIn) {
+        if ((command.trigger.endsWith("undo") || command.trigger.endsWith("redo")) && command.isBuiltIn) {
             if (source.isPassword) { return }
             isProcessing = true
             processingStartedAt = System.currentTimeMillis()
             currentJob?.cancel()
-            handleUndo(source, cleanText)
+            val isRedo = command.trigger.endsWith("redo")
+            handleUndoRedo(source, cleanText, isRedo)
             return
         }
 
@@ -193,7 +194,8 @@ class AssistantService : AccessibilityService() {
                         if (result.isSuccess) {
                             spinnerJob?.cancel()
                             spinnerJob = null
-                            lastOriginalText = originalText
+                            val fieldId = undoManager.fieldId(source)
+                            undoManager.pushState(fieldId, originalText)
                             replaceText(source, result.getOrThrow())
                             performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                             if (providerType == "custom") {
@@ -268,23 +270,32 @@ class AssistantService : AccessibilityService() {
         }
     }
 
-    private fun handleUndo(source: AccessibilityNodeInfo, currentText: String) {
+    private fun handleUndoRedo(source: AccessibilityNodeInfo, cleanText: String, isRedo: Boolean) {
         currentJob = serviceScope.launch {
             try {
-                val previousText = lastOriginalText
-                if (previousText == null) {
-                    replaceText(source, currentText)
+                // Note: fieldId is derived from the live node. If the node is stale
+                // (user navigated away), the ID may not match the original entry,
+                // and undo/redo will return null (treated as empty stack).
+                val fieldId = undoManager.fieldId(source)
+                val restoredText = if (isRedo) undoManager.redo(fieldId) else undoManager.undo(fieldId)
+
+                if (restoredText == null) {
+                    replaceText(source, cleanText)
                     performHapticFeedback(HapticFeedbackConstants.REJECT)
-                    showToast("Nothing to undo")
+                    showToast(if (isRedo) "Nothing to redo" else "Nothing to undo")
                 } else {
-                    lastOriginalText = currentText
-                    replaceText(source, previousText)
+                    if (isRedo) {
+                        undoManager.pushUndo(fieldId, cleanText)
+                    } else {
+                        undoManager.pushRedo(fieldId, cleanText)
+                    }
+                    replaceText(source, restoredText)
                     performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                showToast("Could not undo")
+                showToast(if (isRedo) "Could not redo" else "Could not undo")
             } finally {
                 withContext(NonCancellable + Dispatchers.Main) {
                     processingStartedAt = 0L
