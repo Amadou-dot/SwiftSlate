@@ -61,6 +61,7 @@ class AssistantService : AccessibilityService() {
     private var triggerLastChars = setOf<Char>()
     private var cachedPrefix = CommandManager.DEFAULT_PREFIX
     private var currentJob: Job? = null
+    // Concurrency: access is serialized by the isProcessing guard + currentJob cancellation.
     private val undoManager = UndoManager()
     private var lastTriggerRefresh = 0L
     private var currentOverlayToast: View? = null

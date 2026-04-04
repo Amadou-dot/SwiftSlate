@@ -61,6 +61,8 @@ class UndoManager(
     // Note: node references can go stale when the user navigates away from
     // a field. The field ID is derived at call time from a live node; if the
     // node is stale, the ID may not match the original entry.
+    // The hashCode() fallback is unstable across node instances, so undo/redo
+    // only works reliably for fields that have a viewIdResourceName.
     fun fieldId(node: AccessibilityNodeInfo): String {
         val resName = node.viewIdResourceName
         return if (resName != null) {
