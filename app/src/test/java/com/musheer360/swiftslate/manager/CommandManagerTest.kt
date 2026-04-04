@@ -47,6 +47,14 @@ class CommandManagerTest {
     }
 
     @Test
+    fun findCommand_withRedoTrigger_returnsRedoCommand() {
+        val result = commandManager.findCommand("text?redo")
+        assertNotNull(result)
+        assertEquals("?redo", result!!.trigger)
+        assertTrue(result.isBuiltIn)
+    }
+
+    @Test
     fun findCommand_noTrigger_returnsNull() {
         assertNull(commandManager.findCommand("just some plain text"))
     }
@@ -87,9 +95,9 @@ class CommandManagerTest {
     // --- getCommands ---
 
     @Test
-    fun getCommands_returnsNineBuiltInByDefault() {
+    fun getCommands_returnsTenBuiltInByDefault() {
         val commands = commandManager.getCommands()
-        assertEquals(9, commands.size)
+        assertEquals(10, commands.size)
     }
 
     @Test
@@ -102,7 +110,7 @@ class CommandManagerTest {
     fun getCommands_afterAddingCustom_includesIt() {
         commandManager.addCustomCommand(Command("?myCmd", "do something"))
         val commands = commandManager.getCommands()
-        assertEquals(10, commands.size)
+        assertEquals(11, commands.size)
         assertTrue(commands.any { it.trigger == "?myCmd" })
     }
 

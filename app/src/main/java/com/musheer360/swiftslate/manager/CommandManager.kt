@@ -25,7 +25,8 @@ class CommandManager(context: Context) {
         "casual" to "Rewrite in a casual, friendly tone.",
         "emoji" to "Add relevant emojis throughout.",
         "reply" to "Generate a contextual reply to this message.",
-        "undo" to "Undo the last replacement and restore the original text."
+        "undo" to "Undo the last replacement and restore the original text.",
+        "redo" to "Redo the last undone replacement."
     )
 
     fun getTriggerPrefix(): String {
