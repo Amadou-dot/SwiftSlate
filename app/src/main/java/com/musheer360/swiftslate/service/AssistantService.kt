@@ -303,28 +303,41 @@ class AssistantService : AccessibilityService() {
 
         val success = source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
 
-        if (!success) {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val oldClip = clipboard.primaryClip
-            val newClip = ClipData.newPlainText("SwiftSlate Result", newText)
-            clipboard.setPrimaryClip(newClip)
-
-            val selectAllArgs = Bundle()
-            selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
-            selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, source.text?.length ?: 0)
-            source.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectAllArgs)
-
-            source.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-
-            handler.postDelayed({
-                if (oldClip != null) {
-                    clipboard.setPrimaryClip(oldClip)
-                }
-            }, 500)
+        if (success) {
+            // Verify the text actually persisted — some apps (Firefox, Google Keep)
+            // return true but don't update their internal text state
+            delay(100)
+            source.refresh()
+            val currentText = source.text?.toString()
+            if (currentText == newText) {
+                return@withContext // Text stuck, we're done
+            }
+            // Text didn't persist, fall through to clipboard fallback
         }
+
+        // Clipboard fallback: select all + paste (goes through app's input pipeline)
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val oldClip = clipboard.primaryClip
+        val newClip = ClipData.newPlainText("SwiftSlate Result", newText)
+        clipboard.setPrimaryClip(newClip)
+
+        source.refresh()
+        val selectAllArgs = Bundle()
+        selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+        selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, source.text?.length ?: 0)
+        source.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectAllArgs)
+
+        source.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+
+        handler.postDelayed({
+            if (oldClip != null) {
+                clipboard.setPrimaryClip(oldClip)
+            }
+        }, 500)
     }
 
     private fun setFieldText(source: AccessibilityNodeInfo, text: String) {
+        source.refresh()
         val bundle = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }
