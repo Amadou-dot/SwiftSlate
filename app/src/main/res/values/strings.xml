@@ -26,6 +26,7 @@
     <string name="keys_valid_added">Valid key added!</string>
     <string name="keys_already_added">This key has already been added</string>
     <string name="keys_validation_failed">Validation failed</string>
+    <string name="keys_get_api_key">Get your %1$s API key ↗</string>
 
     <!-- Commands -->
     <string name="commands_title">Commands</string>
@@ -63,4 +64,13 @@
     <string name="settings_prefix_error_alphanumeric">Cannot be a letter or digit</string>
     <string name="settings_endpoint_error_scheme">Must start with https://</string>
     <string name="settings_endpoint_error_spaces">URL cannot contain spaces</string>
+
+    <!-- Backup -->
+    <string name="backup_title">Backup &amp; Restore</string>
+    <string name="backup_desc">Export or import your custom commands as a JSON file.</string>
+    <string name="backup_export">Export</string>
+    <string name="backup_import">Import</string>
+    <string name="backup_export_success">Commands exported successfully</string>
+    <string name="backup_import_success">Commands imported successfully</string>
+    <string name="backup_import_error">Invalid backup file</string>
 </resources>

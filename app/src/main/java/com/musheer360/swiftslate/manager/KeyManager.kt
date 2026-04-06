@@ -47,8 +47,7 @@ class KeyManager(context: Context) {
                 keyGenerator.init(keyGenParameterSpec)
                 keyGenerator.generateKey()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
         }
     }
 
@@ -57,15 +56,14 @@ class KeyManager(context: Context) {
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
             keyStore.load(null)
             keyStore.getKey(KEY_ALIAS, null) as? SecretKey
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
             null
         }
     }
 
     private fun encrypt(plainText: String): String {
+        val secretKey = getSecretKey() ?: return plainText
         return try {
-            val secretKey = getSecretKey() ?: return plainText // Fallback to plain text if keystore fails
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
             val iv = cipher.iv
@@ -73,20 +71,19 @@ class KeyManager(context: Context) {
             val ivString = Base64.encodeToString(iv, Base64.NO_WRAP)
             val cipherTextString = Base64.encodeToString(cipherText, Base64.NO_WRAP)
             "$ivString$IV_SEPARATOR$cipherTextString"
-        } catch (e: Exception) {
-            e.printStackTrace()
-            plainText // Fallback
+        } catch (_: Exception) {
+            plainText
         }
     }
 
     private fun decrypt(encryptedString: String): String {
+        if (!encryptedString.contains(IV_SEPARATOR)) {
+            return encryptedString
+        }
+        val parts = encryptedString.split(IV_SEPARATOR)
+        if (parts.size != 2) return encryptedString
+
         return try {
-            if (!encryptedString.contains(IV_SEPARATOR)) {
-                return encryptedString // Assume it's plain text fallback or unencrypted legacy data
-            }
-            val parts = encryptedString.split(IV_SEPARATOR)
-            if (parts.size != 2) return encryptedString
-            
             val iv = Base64.decode(parts[0], Base64.NO_WRAP)
             val cipherText = Base64.decode(parts[1], Base64.NO_WRAP)
 
@@ -94,12 +91,11 @@ class KeyManager(context: Context) {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val spec = GCMParameterSpec(128, iv)
             cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
-            
+
             val plainTextBytes = cipher.doFinal(cipherText)
             String(plainTextBytes, StandardCharsets.UTF_8)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            "[]" // Fallback to empty array on decryption failure
+        } catch (_: Exception) {
+            encryptedString
         }
     }
 
@@ -113,8 +109,7 @@ class KeyManager(context: Context) {
             for (i in 0 until arr.length()) {
                 list.add(arr.getString(i))
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
         }
         cachedKeys = list
         return list
@@ -123,8 +118,7 @@ class KeyManager(context: Context) {
     private fun saveKeys(keys: List<String>) {
         cachedKeys = null
         val arr = JSONArray(keys)
-        val encryptedStr = encrypt(arr.toString())
-        prefs.edit().putString(PREF_KEY_ARRAY, encryptedStr).apply()
+        prefs.edit().putString(PREF_KEY_ARRAY, encrypt(arr.toString())).apply()
     }
 
     fun addKey(key: String) {

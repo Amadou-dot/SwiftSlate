@@ -1,6 +1,7 @@
 package com.musheer360.swiftslate.ui
 
 import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +32,7 @@ import kotlinx.coroutines.launch
 fun KeysScreen() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val uriHandler = LocalUriHandler.current
     val keyManager = remember { KeyManager(context) }
     var keys by remember { mutableStateOf(keyManager.getKeys()) }
     var newKey by remember { mutableStateOf("") }
@@ -40,8 +43,8 @@ fun KeysScreen() {
     val geminiClient = remember { GeminiClient() }
     val openAIClient = remember { OpenAICompatibleClient() }
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
-    val providerType = remember { prefs.getString("provider_type", "gemini") ?: "gemini" }
-    val customEndpoint = remember { prefs.getString("custom_endpoint", "") ?: "" }
+    val providerType = prefs.getString("provider_type", "gemini") ?: "gemini"
+    val customEndpoint = prefs.getString("custom_endpoint", "") ?: ""
 
     val validAddedMsg = stringResource(R.string.keys_valid_added)
     val alreadyAddedMsg = stringResource(R.string.keys_already_added)
@@ -118,6 +121,19 @@ fun KeysScreen() {
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+            val (apiKeyUrl, providerName) = if (providerType == "custom") {
+                "https://platform.openai.com/api-keys" to "OpenAI"
+            } else {
+                "https://aistudio.google.com/api-keys" to "Gemini"
+            }
+            Text(
+                text = stringResource(R.string.keys_get_api_key, providerName),
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { uriHandler.openUri(apiKeyUrl) }
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -126,7 +142,7 @@ fun KeysScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            items(keys) { key ->
+            items(keys, key = { it }) { key ->
                 SlateCard {
                     Row(
                         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},

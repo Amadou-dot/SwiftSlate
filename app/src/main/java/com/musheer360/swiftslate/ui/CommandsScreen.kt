@@ -177,7 +177,7 @@ fun CommandsScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            items(commands) { cmd ->
+            items(commands, key = { it.trigger }) { cmd ->
                 SlateCard {
                     Row(
                         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},

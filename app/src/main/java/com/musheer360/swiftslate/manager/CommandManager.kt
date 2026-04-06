@@ -77,7 +77,7 @@ class CommandManager(context: Context) {
             customCommands.add(Command(obj.getString("trigger"), obj.getString("prompt"), false,
                 try { CommandType.valueOf(obj.optString("type", CommandType.AI.name)) } catch (_: Exception) { CommandType.AI }))
         }
-        val result = getBuiltInCommands() + customCommands
+        val result = (getBuiltInCommands() + customCommands).sortedByDescending { it.trigger.length }
         cachedCommands = result
         return result
     }
@@ -108,9 +108,32 @@ class CommandManager(context: Context) {
         cachedCommands = null
     }
 
+    fun exportCommands(): String {
+        return prefs.getString("custom_commands", "[]") ?: "[]"
+    }
+
+    fun importCommands(json: String): Boolean {
+        return try {
+            val arr = JSONArray(json)
+            if (arr.length() > 100) return false
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val trigger = obj.optString("trigger", "")
+                val prompt = obj.optString("prompt", "")
+                if (trigger.isBlank() || prompt.isBlank()) return false
+                if (trigger.length > 50 || prompt.length > 5000) return false
+            }
+            prefs.edit().putString("custom_commands", arr.toString()).apply()
+            cachedCommands = null
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun findCommand(text: String): Command? {
         val commands = getCommands()
-        for (cmd in commands.sortedByDescending { it.trigger.length }) {
+        for (cmd in commands) {  // Already sorted by trigger length in getCommands()
             if (text.endsWith(cmd.trigger)) {
                 return cmd
             }

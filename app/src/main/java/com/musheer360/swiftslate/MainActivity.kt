@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
-    object Keys : Screen("keys", "Keys", Icons.Default.Key)
+    object Keys : Screen("keys", "Keys", Icons.Default.Lock)
     object Commands : Screen("commands", "Commands", Icons.AutoMirrored.Filled.List)
     object Settings : Screen("settings", "Settings", Icons.Default.Settings)
 }

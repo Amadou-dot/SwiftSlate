@@ -1,6 +1,8 @@
 package com.musheer360.swiftslate.ui
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -49,6 +51,55 @@ fun SettingsScreen() {
     val prefixErrorAlphanumeric = stringResource(R.string.settings_prefix_error_alphanumeric)
     val endpointErrorScheme = stringResource(R.string.settings_endpoint_error_scheme)
     val endpointErrorSpaces = stringResource(R.string.settings_endpoint_error_spaces)
+
+    // Backup & Restore
+    var backupMessage by remember { mutableStateOf<String?>(null) }
+    var backupSuccess by remember { mutableStateOf(false) }
+    val exportSuccessMsg = stringResource(R.string.backup_export_success)
+    val importSuccessMsg = stringResource(R.string.backup_import_success)
+    val importErrorMsg = stringResource(R.string.backup_import_error)
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { os ->
+                    os.write(commandManager.exportCommands().toByteArray())
+                }
+                backupMessage = exportSuccessMsg
+                backupSuccess = true
+            } catch (_: Exception) {
+                backupMessage = importErrorMsg
+                backupSuccess = false
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            try {
+                val json = context.contentResolver.openInputStream(it)?.use { stream ->
+                    val bytes = ByteArray(1_000_000)
+                    var totalRead = 0
+                    while (totalRead < bytes.size) {
+                        val read = stream.read(bytes, totalRead, bytes.size - totalRead)
+                        if (read == -1) break
+                        totalRead += read
+                    }
+                    if (stream.read() != -1) null else String(bytes, 0, totalRead)
+                } ?: ""
+                if (commandManager.importCommands(json)) {
+                    backupMessage = importSuccessMsg
+                    backupSuccess = true
+                } else {
+                    backupMessage = importErrorMsg
+                    backupSuccess = false
+                }
+            } catch (_: Exception) {
+                backupMessage = importErrorMsg
+                backupSuccess = false
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -280,6 +331,48 @@ fun SettingsScreen() {
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SlateCard {
+            Text(
+                text = stringResource(R.string.backup_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.backup_desc),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    backupMessage = null
+                    exportLauncher.launch("swiftslate-commands.json")
+                }) {
+                    Text(stringResource(R.string.backup_export))
+                }
+                Button(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    backupMessage = null
+                    importLauncher.launch(arrayOf("application/json"))
+                }) {
+                    Text(stringResource(R.string.backup_import))
+                }
+            }
+            backupMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    color = if (backupSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

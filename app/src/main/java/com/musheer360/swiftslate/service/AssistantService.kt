@@ -354,6 +354,11 @@ class AssistantService : AccessibilityService() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val oldClip = clipboard.primaryClip
         val newClip = ClipData.newPlainText("SwiftSlate Result", newText)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            newClip.description.extras = android.os.PersistableBundle().apply {
+                putBoolean("android.content.extra.IS_SENSITIVE", true)
+            }
+        }
         clipboard.setPrimaryClip(newClip)
 
         source.refresh()
@@ -368,7 +373,7 @@ class AssistantService : AccessibilityService() {
             if (oldClip != null) {
                 clipboard.setPrimaryClip(oldClip)
             }
-        }, 500)
+        }, 200)
     }
 
     private fun setFieldText(source: AccessibilityNodeInfo, text: String) {

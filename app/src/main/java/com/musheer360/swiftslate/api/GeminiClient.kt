@@ -22,9 +22,10 @@ class GeminiClient {
     suspend fun validateKey(apiKey: String): Result<String> = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         try {
-            connection = URL("https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey&pageSize=1")
+            connection = URL("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")
                 .openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
+            connection.setRequestProperty("x-goog-api-key", apiKey)
             connection.connectTimeout = 15_000
             connection.readTimeout = 15_000
 
@@ -104,10 +105,11 @@ class GeminiClient {
     ): Result<String> {
         var connection: HttpURLConnection? = null
         return try {
-            connection = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
+            connection = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
                 .openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("x-goog-api-key", apiKey)
             connection.doOutput = true
             connection.connectTimeout = 30_000
             connection.readTimeout = 60_000
