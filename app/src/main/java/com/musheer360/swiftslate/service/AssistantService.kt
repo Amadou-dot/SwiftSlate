@@ -30,6 +30,7 @@ import com.musheer360.swiftslate.api.OpenAICompatibleClient
 import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.manager.KeyManager
 import com.musheer360.swiftslate.model.Command
+import com.musheer360.swiftslate.model.CommandType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,10 +126,12 @@ class AssistantService : AccessibilityService() {
 
         val command = commandManager.findCommand(text) ?: return
 
-        val cleanText = text.substring(0, text.length - command.trigger.length).trim()
+        val precedingText = text.substring(0, text.length - command.trigger.length)
+        val cleanText = precedingText.trim()
+
+        if (source.isPassword) return
 
         if (command.trigger.endsWith("undo") && command.isBuiltIn) {
-            if (source.isPassword) { return }
             isProcessing = true
             processingStartedAt = System.currentTimeMillis()
             currentJob?.cancel()
@@ -136,12 +139,42 @@ class AssistantService : AccessibilityService() {
             return
         }
 
-        if (cleanText.isEmpty() || source.isPassword) { return }
-
-        isProcessing = true
-        processingStartedAt = System.currentTimeMillis()
-        currentJob?.cancel()
-        processCommand(source, cleanText, command)
+        when (command.type) {
+            CommandType.TEXT_REPLACER -> {
+                isProcessing = true
+                processingStartedAt = System.currentTimeMillis()
+                currentJob?.cancel()
+                currentJob = serviceScope.launch {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            lastOriginalText = precedingText.ifEmpty { text }
+                            replaceText(source, precedingText + command.prompt)
+                            performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            showToast("Could not replace text")
+                        }
+                    } finally {
+                        withContext(NonCancellable + Dispatchers.Main) {
+                            processingStartedAt = 0L
+                            if (!handler.postDelayed({ isProcessing = false }, 500)) {
+                                isProcessing = false
+                            }
+                        }
+                    }
+                }
+            }
+            CommandType.AI -> {
+                if (cleanText.isEmpty()) return
+                isProcessing = true
+                processingStartedAt = System.currentTimeMillis()
+                currentJob?.cancel()
+                processCommand(source, cleanText, command)
+            }
+        }
     }
 
     private fun processCommand(source: AccessibilityNodeInfo, text: String, command: Command) {

@@ -3,6 +3,7 @@ package com.musheer360.swiftslate.manager
 import android.content.Context
 import android.content.SharedPreferences
 import com.musheer360.swiftslate.model.Command
+import com.musheer360.swiftslate.model.CommandType
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -51,6 +52,7 @@ class CommandManager(context: Context) {
             val newObj = JSONObject()
             newObj.put("trigger", migrated)
             newObj.put("prompt", obj.getString("prompt"))
+            newObj.put("type", obj.optString("type", CommandType.AI.name))
             newArr.put(newObj)
         }
         prefs.edit().putString("custom_commands", newArr.toString()).apply()
@@ -68,7 +70,8 @@ class CommandManager(context: Context) {
         val customCommands = mutableListOf<Command>()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            customCommands.add(Command(obj.getString("trigger"), obj.getString("prompt"), false))
+            customCommands.add(Command(obj.getString("trigger"), obj.getString("prompt"), false,
+                try { CommandType.valueOf(obj.optString("type", CommandType.AI.name)) } catch (_: Exception) { CommandType.AI }))
         }
         return getBuiltInCommands() + customCommands
     }
@@ -79,6 +82,7 @@ class CommandManager(context: Context) {
         val newObj = JSONObject()
         newObj.put("trigger", command.trigger)
         newObj.put("prompt", command.prompt)
+        newObj.put("type", command.type.name)
         arr.put(newObj)
         prefs.edit().putString("custom_commands", arr.toString()).apply()
     }
