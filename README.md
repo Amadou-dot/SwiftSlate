@@ -548,7 +548,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 Made with ❤️ by [**Musheer Alam**](https://github.com/Musheer360)
 
-If SwiftSlate makes your typing life easier, consider giving it a ⭐
+If SwiftSlate saves you time, a ⭐ or [sponsorship](https://github.com/sponsors/Musheer360) means a lot
 
 <br>
 
