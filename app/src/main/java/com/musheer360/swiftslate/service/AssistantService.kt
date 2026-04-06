@@ -230,7 +230,7 @@ class AssistantService : AccessibilityService() {
                         replaceText(source, originalText)
                         performHapticFeedback(HapticFeedbackConstants.REJECT)
                         if (lastErrorMsg != null) {
-                            showToast("SwiftSlate Error: $lastErrorMsg")
+                            showToast(mapErrorMessage(lastErrorMsg))
                         } else {
                             val waitMs = keyManager.getShortestWaitTimeMs()
                             if (waitMs != null) {
@@ -255,7 +255,7 @@ class AssistantService : AccessibilityService() {
                 try { replaceText(source, originalText) } catch (_: Exception) {
                     showToast("Could not restore original text")
                 }
-                showToast("SwiftSlate Error: ${e.message}")
+                showToast(mapErrorMessage(e.message ?: "Unknown error"))
             } finally {
                 withContext(NonCancellable + Dispatchers.Main) {
                     spinnerJob?.cancel()
@@ -352,6 +352,35 @@ class AssistantService : AccessibilityService() {
                 frameIndex = (frameIndex + 1) % SPINNER_FRAMES.size
                 delay(200)
             }
+        }
+    }
+
+    private fun mapErrorMessage(raw: String): String {
+        val lower = raw.lowercase()
+        return when {
+            lower.contains("permission_denied") || lower.contains("permission denied") ->
+                "Your API key doesn't have access to this model."
+            lower.contains("invalid api key") || lower.contains("api key not valid") || lower.contains("api_key_invalid") ->
+                "Invalid API key. Please check your key in Settings."
+            lower.contains("rate limit") || lower.contains("resource_exhausted") || lower.contains("quota") ->
+                "Rate limited. Try again shortly."
+            lower.contains("model not found") || lower.contains("model_not_found") || lower.contains("not found for api version") ->
+                "Model not found. Check your model selection in Settings."
+            lower.contains("safety") || lower.contains("content_filter") || lower.contains("recitation") ||
+                lower.contains("blocked by safety") || lower.contains("finish_reason: safety") ->
+                "Response blocked by safety filters. Try rephrasing."
+            lower.contains("empty response") || lower.contains("no content found") || lower.contains("no choices found") ->
+                "Model returned an empty response. Try again."
+            lower.contains("timeout") || lower.contains("timed out") ->
+                "Request timed out. Check your connection."
+            lower.contains("unable to resolve host") || lower.contains("no address associated") ||
+                lower.contains("network is unreachable") || lower.contains("no route to host") ->
+                "No internet connection."
+            lower.contains("connection refused") || lower.contains("connect failed") ->
+                "Could not reach the API. Check your endpoint URL."
+            lower.contains("bad request") ->
+                "Request failed. Check your settings."
+            else -> raw
         }
     }
 

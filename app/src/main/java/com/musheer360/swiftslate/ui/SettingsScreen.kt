@@ -37,6 +37,7 @@ fun SettingsScreen() {
     // Custom provider settings
     var customEndpoint by remember { mutableStateOf(prefs.getString("custom_endpoint", "") ?: "") }
     var customModel by remember { mutableStateOf(prefs.getString("custom_model", "") ?: "") }
+    var endpointError by remember { mutableStateOf<String?>(null) }
 
     // Trigger prefix
     val commandManager = remember { CommandManager(context) }
@@ -46,6 +47,8 @@ fun SettingsScreen() {
     val prefixErrorLength = stringResource(R.string.settings_prefix_error_length)
     val prefixErrorWhitespace = stringResource(R.string.settings_prefix_error_whitespace)
     val prefixErrorAlphanumeric = stringResource(R.string.settings_prefix_error_alphanumeric)
+    val endpointErrorScheme = stringResource(R.string.settings_endpoint_error_scheme)
+    val endpointErrorSpaces = stringResource(R.string.settings_endpoint_error_spaces)
 
     Column(
         modifier = Modifier
@@ -168,16 +171,33 @@ fun SettingsScreen() {
                     value = customEndpoint,
                     onValueChange = {
                         customEndpoint = it
-                        prefs.edit().putString("custom_endpoint", it).remove("structured_output_disabled").apply()
+                        endpointError = when {
+                            it.isBlank() -> null
+                            !it.startsWith("http://") && !it.startsWith("https://") -> endpointErrorScheme
+                            it.contains(" ") -> endpointErrorSpaces
+                            else -> null
+                        }
+                        if (endpointError == null) {
+                            prefs.edit().putString("custom_endpoint", it).remove("structured_output_disabled").apply()
+                        }
                     },
                     placeholder = { Text(stringResource(R.string.settings_endpoint_placeholder)) },
                     singleLine = true,
+                    isError = endpointError != null,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
+                endpointError?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
