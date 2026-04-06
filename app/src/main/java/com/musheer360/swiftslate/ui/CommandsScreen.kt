@@ -40,6 +40,7 @@ fun CommandsScreen() {
     val prefix = commandManager.getTriggerPrefix()
     val errorPrefixMsg = stringResource(R.string.commands_error_prefix, prefix)
     val errorDuplicateMsg = stringResource(R.string.commands_error_duplicate)
+    val errorEmptyTrigger = stringResource(R.string.commands_error_empty_trigger)
 
     Column(
         modifier = Modifier
@@ -141,6 +142,10 @@ fun CommandsScreen() {
                                 errorMessage = errorPrefixMsg
                                 return@Button
                             }
+                            if (trimmedTrigger == prefix || trimmedTrigger.length <= prefix.length) {
+                                errorMessage = errorEmptyTrigger
+                                return@Button
+                            }
                             if (commands.any { it.trigger == trimmedTrigger && it.trigger != editingTrigger }) {
                                 errorMessage = errorDuplicateMsg
                                 return@Button
@@ -159,7 +164,7 @@ fun CommandsScreen() {
                             selectedType = CommandType.AI
                         }
                     },
-                    enabled = trigger.isNotBlank() && prompt.isNotBlank()
+                    enabled = trigger.isNotBlank() && trigger.trim() != prefix && prompt.isNotBlank()
                 ) {
                     Text(if (editingTrigger != null) stringResource(R.string.commands_save_command) else stringResource(R.string.commands_add_command))
                 }
