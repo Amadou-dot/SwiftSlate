@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -58,7 +61,8 @@ fun SwiftSlateMainScreen() {
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
+                tonalElevation = 0.dp,
+                modifier = Modifier.height(56.dp)
             ) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -92,10 +96,29 @@ fun SwiftSlateMainScreen() {
             }
         }
     ) { innerPadding ->
+        val tabOrder = mapOf("dashboard" to 0, "keys" to 1, "commands" to 2, "settings" to 3)
         NavHost(
             navController = navController,
             startDestination = Screen.Dashboard.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                val from = tabOrder[initialState.destination.route] ?: 0
+                val to = tabOrder[targetState.destination.route] ?: 0
+                slideIntoContainer(
+                    if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
+                    else AnimatedContentTransitionScope.SlideDirection.Right,
+                    tween(250)
+                )
+            },
+            exitTransition = {
+                val from = tabOrder[initialState.destination.route] ?: 0
+                val to = tabOrder[targetState.destination.route] ?: 0
+                slideOutOfContainer(
+                    if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
+                    else AnimatedContentTransitionScope.SlideDirection.Right,
+                    tween(250)
+                )
+            }
         ) {
             composable(Screen.Dashboard.route) { DashboardScreen() }
             composable(Screen.Keys.route) { KeysScreen() }

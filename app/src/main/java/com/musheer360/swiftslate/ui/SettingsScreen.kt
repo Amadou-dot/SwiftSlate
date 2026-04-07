@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -130,6 +131,8 @@ fun SettingsScreen() {
                     modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 )
                 ExposedDropdownMenu(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
                     expanded = providerExpanded,
                     onDismissRequest = { providerExpanded = false }
                 ) {
@@ -180,6 +183,8 @@ fun SettingsScreen() {
                         modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
                         expanded = modelExpanded,
                         onDismissRequest = { modelExpanded = false }
                     ) {
@@ -211,6 +216,8 @@ fun SettingsScreen() {
                         modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
                         expanded = groqModelExpanded,
                         onDismissRequest = { groqModelExpanded = false }
                     ) {
@@ -302,31 +309,37 @@ fun SettingsScreen() {
 
         SectionHeader(stringResource(R.string.settings_trigger_prefix_title))
         SlateCard {
-            Text(
-                text = stringResource(R.string.settings_trigger_prefix_desc, triggerPrefix),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            SlateTextField(
-                value = triggerPrefix,
-                onValueChange = { input ->
-                    val filtered = input.take(1)
-                    triggerPrefix = filtered
-                    prefixError = when {
-                        filtered.length != 1 -> prefixErrorLength
-                        filtered[0].isWhitespace() -> prefixErrorWhitespace
-                        filtered[0].isLetterOrDigit() -> prefixErrorAlphanumeric
-                        else -> {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            commandManager.setTriggerPrefix(filtered)
-                            null
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_trigger_prefix_desc, triggerPrefix),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).padding(end = 16.dp)
+                )
+                SlateTextField(
+                    value = triggerPrefix,
+                    onValueChange = { input ->
+                        val filtered = input.take(1)
+                        triggerPrefix = filtered
+                        prefixError = when {
+                            filtered.length != 1 -> prefixErrorLength
+                            filtered[0].isWhitespace() -> prefixErrorWhitespace
+                            filtered[0].isLetterOrDigit() -> prefixErrorAlphanumeric
+                            else -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                commandManager.setTriggerPrefix(filtered)
+                                null
+                            }
                         }
-                    }
-                },
-                isError = prefixError != null,
-                modifier = Modifier.width(80.dp)
-            )
+                    },
+                    isError = prefixError != null,
+                    modifier = Modifier.width(64.dp)
+                )
+            }
             prefixError?.let { msg ->
                 Text(
                     text = msg,
@@ -347,14 +360,18 @@ fun SettingsScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         backupMessage = null
                         exportLauncher.launch("swiftslate-commands.json")
                     },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.backup_export))
                 }
@@ -364,7 +381,8 @@ fun SettingsScreen() {
                         backupMessage = null
                         importLauncher.launch(arrayOf("application/json"))
                     },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.backup_import))
                 }

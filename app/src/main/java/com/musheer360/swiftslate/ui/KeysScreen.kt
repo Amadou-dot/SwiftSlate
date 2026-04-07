@@ -29,6 +29,7 @@ import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SectionHeader
 import com.musheer360.swiftslate.ui.components.SlateCard
 import com.musheer360.swiftslate.ui.components.SlateDivider
+import com.musheer360.swiftslate.ui.components.SlateItemCard
 import com.musheer360.swiftslate.ui.components.SlateTextField
 import kotlinx.coroutines.launch
 
@@ -68,55 +69,51 @@ fun KeysScreen() {
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(
-                    onClick = {
-                        if (newKey.isNotBlank()) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            isTesting = true
-                            testResult = null
-                            scope.launch {
-                                val trimmedKey = newKey.trim()
-                                if (keyManager.getKeys().contains(trimmedKey)) {
-                                    isTesting = false
-                                    testResult = alreadyAddedMsg
-                                    testSuccess = false
-                                    return@launch
-                                }
-                                val result = run {
-                                    val providerType = prefs.getString("provider_type", "gemini") ?: "gemini"
-                                    val customEndpoint = prefs.getString("custom_endpoint", "") ?: ""
-                                    when {
-                                        providerType == "groq" ->
-                                            openAIClient.validateKey(trimmedKey, "https://api.groq.com/openai/v1")
-                                        providerType == "custom" && customEndpoint.isNotBlank() ->
-                                            openAIClient.validateKey(trimmedKey, customEndpoint)
-                                        else ->
-                                            geminiClient.validateKey(trimmedKey)
-                                    }
-                                }
+            Button(
+                onClick = {
+                    if (newKey.isNotBlank()) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isTesting = true
+                        testResult = null
+                        scope.launch {
+                            val trimmedKey = newKey.trim()
+                            if (keyManager.getKeys().contains(trimmedKey)) {
                                 isTesting = false
-                                if (result.isSuccess) {
-                                    keyManager.addKey(trimmedKey)
-                                    keys = keyManager.getKeys()
-                                    newKey = ""
-                                    testResult = validAddedMsg
-                                    testSuccess = true
-                                } else {
-                                    testResult = result.exceptionOrNull()?.message ?: validationFailedMsg
-                                    testSuccess = false
+                                testResult = alreadyAddedMsg
+                                testSuccess = false
+                                return@launch
+                            }
+                            val result = run {
+                                val providerType = prefs.getString("provider_type", "gemini") ?: "gemini"
+                                val customEndpoint = prefs.getString("custom_endpoint", "") ?: ""
+                                when {
+                                    providerType == "groq" ->
+                                        openAIClient.validateKey(trimmedKey, "https://api.groq.com/openai/v1")
+                                    providerType == "custom" && customEndpoint.isNotBlank() ->
+                                        openAIClient.validateKey(trimmedKey, customEndpoint)
+                                    else ->
+                                        geminiClient.validateKey(trimmedKey)
                                 }
                             }
+                            isTesting = false
+                            if (result.isSuccess) {
+                                keyManager.addKey(trimmedKey)
+                                keys = keyManager.getKeys()
+                                newKey = ""
+                                testResult = validAddedMsg
+                                testSuccess = true
+                            } else {
+                                testResult = result.exceptionOrNull()?.message ?: validationFailedMsg
+                                testSuccess = false
+                            }
                         }
-                    },
-                    enabled = newKey.isNotBlank() && !isTesting,
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(if (isTesting) stringResource(R.string.keys_testing) else stringResource(R.string.keys_add_key))
-                }
+                    }
+                },
+                enabled = newKey.isNotBlank() && !isTesting,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isTesting) stringResource(R.string.keys_testing) else stringResource(R.string.keys_add_key))
             }
             if (testResult != null) {
                 Text(
@@ -150,23 +147,17 @@ fun KeysScreen() {
             SectionHeader(stringResource(R.string.dashboard_api_keys_title))
             SlateCard {
                 LazyColumn(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(keys, key = { _, key -> key }) { index, key ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .semantics(mergeDescendants = true) {},
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        SlateItemCard {
                             Text(
                                 text = "••••••••" + key.takeLast(6),
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 15.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).semantics(mergeDescendants = true) {}
                             )
                             IconButton(
                                 onClick = {
@@ -183,9 +174,6 @@ fun KeysScreen() {
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                        }
-                        if (index < keys.lastIndex) {
-                            SlateDivider()
                         }
                     }
                 }

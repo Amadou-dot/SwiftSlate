@@ -28,6 +28,7 @@ import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SectionHeader
 import com.musheer360.swiftslate.ui.components.SlateCard
 import com.musheer360.swiftslate.ui.components.SlateDivider
+import com.musheer360.swiftslate.ui.components.SlateItemCard
 import com.musheer360.swiftslate.ui.components.SlateTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,6 +38,10 @@ fun CommandsScreen() {
     val haptic = LocalHapticFeedback.current
     val commandManager = remember { CommandManager(context) }
     var commands by remember { mutableStateOf(commandManager.getCommands()) }
+    // Display order: built-in first, then custom in insertion order
+    val displayCommands by remember(commands) {
+        mutableStateOf(commands.filter { it.isBuiltIn } + commands.filter { !it.isBuiltIn })
+    }
     var trigger by rememberSaveable { mutableStateOf("") }
     var prompt by rememberSaveable { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -65,7 +70,15 @@ fun CommandsScreen() {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedType = CommandType.AI
                     },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primary,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                        activeBorderColor = MaterialTheme.colorScheme.primary,
+                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
+                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        inactiveBorderColor = MaterialTheme.colorScheme.outline
+                    )
                 ) {
                     Text(stringResource(R.string.commands_type_ai))
                 }
@@ -75,7 +88,15 @@ fun CommandsScreen() {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedType = CommandType.TEXT_REPLACER
                     },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primary,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                        activeBorderColor = MaterialTheme.colorScheme.primary,
+                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
+                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        inactiveBorderColor = MaterialTheme.colorScheme.outline
+                    )
                 ) {
                     Text(stringResource(R.string.commands_type_replacer))
                 }
@@ -113,79 +134,70 @@ fun CommandsScreen() {
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                if (editingTrigger != null) {
-                    TextButton(
-                        onClick = {
-                            trigger = ""
-                            prompt = ""
-                            errorMessage = null
-                            editingTrigger = null
-                            selectedType = CommandType.AI
-                        }
-                    ) {
-                        Text(stringResource(R.string.commands_cancel))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Button(
+            if (editingTrigger != null) {
+                TextButton(
                     onClick = {
-                        val trimmedTrigger = trigger.trim()
-                        if (trimmedTrigger.isNotBlank() && prompt.isNotBlank()) {
-                            if (!trimmedTrigger.startsWith(prefix)) {
-                                errorMessage = errorPrefixMsg
-                                return@Button
-                            }
-                            if (trimmedTrigger == prefix || trimmedTrigger.length <= prefix.length) {
-                                errorMessage = errorEmptyTrigger
-                                return@Button
-                            }
-                            if (commands.any { it.trigger == trimmedTrigger && it.trigger != editingTrigger }) {
-                                errorMessage = errorDuplicateMsg
-                                return@Button
-                            }
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            if (editingTrigger != null) {
-                                commandManager.removeCustomCommand(editingTrigger!!)
-                            }
-                            val newCommand = Command(trimmedTrigger, prompt.trim(), false, selectedType)
-                            commandManager.addCustomCommand(newCommand)
-                            commands = commandManager.getCommands()
-                            trigger = ""
-                            prompt = ""
-                            errorMessage = null
-                            editingTrigger = null
-                            selectedType = CommandType.AI
-                        }
+                        trigger = ""
+                        prompt = ""
+                        errorMessage = null
+                        editingTrigger = null
+                        selectedType = CommandType.AI
                     },
-                    enabled = trigger.isNotBlank() && trigger.trim() != prefix && prompt.isNotBlank(),
-                    shape = RoundedCornerShape(10.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (editingTrigger != null) stringResource(R.string.commands_save_command) else stringResource(R.string.commands_add_command))
+                    Text(stringResource(R.string.commands_cancel))
                 }
+            }
+            Button(
+                onClick = {
+                    val trimmedTrigger = trigger.trim()
+                    if (trimmedTrigger.isNotBlank() && prompt.isNotBlank()) {
+                        if (!trimmedTrigger.startsWith(prefix)) {
+                            errorMessage = errorPrefixMsg
+                            return@Button
+                        }
+                        if (trimmedTrigger == prefix || trimmedTrigger.length <= prefix.length) {
+                            errorMessage = errorEmptyTrigger
+                            return@Button
+                        }
+                        if (commands.any { it.trigger == trimmedTrigger && it.trigger != editingTrigger }) {
+                            errorMessage = errorDuplicateMsg
+                            return@Button
+                        }
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (editingTrigger != null) {
+                            commandManager.removeCustomCommand(editingTrigger!!)
+                        }
+                        val newCommand = Command(trimmedTrigger, prompt.trim(), false, selectedType)
+                        commandManager.addCustomCommand(newCommand)
+                        commands = commandManager.getCommands()
+                        trigger = ""
+                        prompt = ""
+                        errorMessage = null
+                        editingTrigger = null
+                        selectedType = CommandType.AI
+                    }
+                },
+                enabled = trigger.isNotBlank() && trigger.trim() != prefix && prompt.isNotBlank(),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (editingTrigger != null) stringResource(R.string.commands_save_command) else stringResource(R.string.commands_add_command))
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        if (commands.isNotEmpty()) {
+        if (displayCommands.isNotEmpty()) {
             SectionHeader(stringResource(R.string.commands_title))
             SlateCard {
                 LazyColumn(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 4.dp)
                 ) {
-                    itemsIndexed(commands, key = { _, cmd -> cmd.trigger }) { index, cmd ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .semantics(mergeDescendants = true) {},
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    itemsIndexed(displayCommands, key = { _, cmd -> cmd.trigger }) { index, cmd ->
+                        SlateItemCard {
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -260,9 +272,6 @@ fun CommandsScreen() {
                                     )
                                 }
                             }
-                        }
-                        if (index < commands.lastIndex) {
-                            SlateDivider()
                         }
                     }
                 }

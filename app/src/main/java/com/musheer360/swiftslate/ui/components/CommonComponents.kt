@@ -87,3 +87,20 @@ fun SlateDivider() {
         color = MaterialTheme.colorScheme.outline
     )
 }
+
+@Composable
+fun SlateItemCard(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            content = content
+        )
+    }
+}

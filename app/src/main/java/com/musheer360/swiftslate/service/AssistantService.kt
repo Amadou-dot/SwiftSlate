@@ -63,6 +63,10 @@ class AssistantService : AccessibilityService() {
     private var currentJob: Job? = null
     @Volatile
     private var lastOriginalText: String? = null
+    @Volatile
+    private var lastReplacedText: String? = null
+    private var lastReplacedSource: AccessibilityNodeInfo? = null
+    private var verifyRunnable: Runnable? = null
     private var lastTriggerRefresh = 0L
     private var currentOverlayToast: View? = null
     private var dismissRunnable: Runnable? = null
@@ -130,6 +134,10 @@ class AssistantService : AccessibilityService() {
         if (source.isPassword) return
         val text = source.text?.toString() ?: return
         if (text.isEmpty()) return
+
+        // Skip events where text matches what we just replaced (prevents IME re-commit race)
+        val replaced = lastReplacedText
+        if (replaced != null && text == replaced) return
 
         if (System.currentTimeMillis() - lastTriggerRefresh > TRIGGER_REFRESH_INTERVAL_MS) {
             updateTriggers()
@@ -365,7 +373,8 @@ class AssistantService : AccessibilityService() {
             source.refresh()
             val currentText = source.text?.toString()
             if (currentText == newText) {
-                return@withContext // Text stuck, we're done
+                scheduleTextVerification(source, newText)
+                return@withContext // Text persisted
             }
             // Text didn't persist, fall through to clipboard fallback
         }
@@ -390,6 +399,8 @@ class AssistantService : AccessibilityService() {
 
         source.performAction(AccessibilityNodeInfo.ACTION_PASTE)
 
+        scheduleTextVerification(source, newText)
+
         handler.postDelayed({
             val current = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
             if (current == newText) {
@@ -400,6 +411,31 @@ class AssistantService : AccessibilityService() {
                 }
             }
         }, 500)
+    }
+
+    private fun scheduleTextVerification(source: AccessibilityNodeInfo, expectedText: String) {
+        lastReplacedText = expectedText
+        lastReplacedSource = source
+        verifyRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            try {
+                if (!source.refresh()) return@Runnable
+                val currentText = source.text?.toString()
+                if (currentText != null && currentText != expectedText && currentText.length < expectedText.length) {
+                    // IME clobbered our text — re-set it
+                    val bundle = Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, expectedText)
+                    }
+                    source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+                }
+            } catch (_: Exception) {
+            } finally {
+                lastReplacedText = null
+                lastReplacedSource = null
+            }
+        }
+        verifyRunnable = runnable
+        handler.postDelayed(runnable, 800)
     }
 
     private fun setFieldText(source: AccessibilityNodeInfo, text: String): Boolean {
@@ -587,6 +623,8 @@ class AssistantService : AccessibilityService() {
         processingStartedAt = 0L
         currentJob?.cancel()
         handler.removeCallbacksAndMessages(null)
+        lastReplacedText = null
+        lastReplacedSource = null
         dismissOverlayToast()
     }
 
