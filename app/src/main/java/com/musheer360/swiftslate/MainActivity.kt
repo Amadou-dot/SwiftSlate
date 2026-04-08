@@ -5,9 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -55,14 +57,14 @@ fun SwiftSlateMainScreen() {
     val navController = rememberNavController()
     val items = listOf(Screen.Dashboard, Screen.Keys, Screen.Commands, Screen.Settings)
     val haptic = LocalHapticFeedback.current
+    var lastNavTime by remember { mutableLongStateOf(0L) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp,
-                modifier = Modifier.height(64.dp)
+                tonalElevation = 0.dp
             ) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -72,18 +74,21 @@ fun SwiftSlateMainScreen() {
                         icon = {
                             Icon(
                                 screen.icon,
-                                contentDescription = screen.title,
-                                modifier = Modifier.padding(vertical = 2.dp)
+                                contentDescription = screen.title
                             )
                         },
                         label = null,
                         selected = currentRoute == screen.route,
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            val now = System.currentTimeMillis()
+                            if (now - lastNavTime > 300) {
+                                lastNavTime = now
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
@@ -104,37 +109,41 @@ fun SwiftSlateMainScreen() {
             enterTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                slideIntoContainer(
+                fadeIn(tween(300, easing = LinearOutSlowInEasing)) + slideIntoContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200)
+                    tween(300, easing = LinearOutSlowInEasing),
+                    initialOffset = { it / 5 }
                 )
             },
             exitTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                slideOutOfContainer(
+                fadeOut(tween(200, easing = FastOutLinearInEasing)) + slideOutOfContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200)
+                    tween(200, easing = FastOutLinearInEasing),
+                    targetOffset = { it / 5 }
                 )
             },
             popEnterTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                slideIntoContainer(
+                fadeIn(tween(300, easing = LinearOutSlowInEasing)) + slideIntoContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200)
+                    tween(300, easing = LinearOutSlowInEasing),
+                    initialOffset = { it / 5 }
                 )
             },
             popExitTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                slideOutOfContainer(
+                fadeOut(tween(200, easing = FastOutLinearInEasing)) + slideOutOfContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200)
+                    tween(200, easing = FastOutLinearInEasing),
+                    targetOffset = { it / 5 }
                 )
             }
         ) {
