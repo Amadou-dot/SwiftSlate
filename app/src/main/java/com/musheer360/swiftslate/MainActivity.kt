@@ -5,11 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -102,6 +99,7 @@ fun SwiftSlateMainScreen() {
         }
     ) { innerPadding ->
         val tabOrder = mapOf("dashboard" to 0, "keys" to 1, "commands" to 2, "settings" to 3)
+        val emphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
         NavHost(
             navController = navController,
             startDestination = Screen.Dashboard.route,
@@ -109,41 +107,37 @@ fun SwiftSlateMainScreen() {
             enterTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                fadeIn(tween(300, easing = LinearOutSlowInEasing)) + slideIntoContainer(
+                slideIntoContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(300, easing = LinearOutSlowInEasing),
-                    initialOffset = { it / 5 }
+                    tween(350, easing = emphasizedDecelerate)
                 )
             },
             exitTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                fadeOut(tween(200, easing = FastOutLinearInEasing)) + slideOutOfContainer(
+                slideOutOfContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200, easing = FastOutLinearInEasing),
-                    targetOffset = { it / 5 }
+                    tween(350, easing = emphasizedDecelerate)
                 )
             },
             popEnterTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                fadeIn(tween(300, easing = LinearOutSlowInEasing)) + slideIntoContainer(
+                slideIntoContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(300, easing = LinearOutSlowInEasing),
-                    initialOffset = { it / 5 }
+                    tween(350, easing = emphasizedDecelerate)
                 )
             },
             popExitTransition = {
                 val from = tabOrder[initialState.destination.route] ?: 0
                 val to = tabOrder[targetState.destination.route] ?: 0
-                fadeOut(tween(200, easing = FastOutLinearInEasing)) + slideOutOfContainer(
+                slideOutOfContainer(
                     if (to > from) AnimatedContentTransitionScope.SlideDirection.Left
                     else AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(200, easing = FastOutLinearInEasing),
-                    targetOffset = { it / 5 }
+                    tween(350, easing = emphasizedDecelerate)
                 )
             }
         ) {
