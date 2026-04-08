@@ -65,6 +65,8 @@ class AssistantService : AccessibilityService() {
     private var lastOriginalText: String? = null
     @Volatile
     private var lastReplacedText: String? = null
+    @Volatile
+    private var lastReplacedAt = 0L
     private var lastReplacedSource: AccessibilityNodeInfo? = null
     private var verifyRunnable: Runnable? = null
     private var lastTriggerRefresh = 0L
@@ -137,7 +139,8 @@ class AssistantService : AccessibilityService() {
 
         // Skip events where text matches what we just replaced (prevents IME re-commit race)
         val replaced = lastReplacedText
-        if (replaced != null && text == replaced) return
+        if (replaced != null && text == replaced &&
+            System.currentTimeMillis() - lastReplacedAt < 1000) return
 
         if (System.currentTimeMillis() - lastTriggerRefresh > TRIGGER_REFRESH_INTERVAL_MS) {
             updateTriggers()
@@ -218,6 +221,8 @@ class AssistantService : AccessibilityService() {
                 serviceScope.launch {
                     showToast("Custom provider not configured. Set endpoint and model in Settings.")
                 }
+                cancelWatchdog()
+                processingStartedAt = 0L
                 isProcessing.set(false)
                 return
             }
@@ -415,6 +420,7 @@ class AssistantService : AccessibilityService() {
 
     private fun scheduleTextVerification(source: AccessibilityNodeInfo, expectedText: String) {
         lastReplacedText = expectedText
+        lastReplacedAt = System.currentTimeMillis()
         lastReplacedSource = source
         verifyRunnable?.let { handler.removeCallbacks(it) }
         val runnable = Runnable {
@@ -435,7 +441,11 @@ class AssistantService : AccessibilityService() {
             }
         }
         verifyRunnable = runnable
-        handler.postDelayed(runnable, 800)
+        if (!handler.postDelayed(runnable, 800)) {
+            lastReplacedText = null
+            lastReplacedAt = 0L
+            lastReplacedSource = null
+        }
     }
 
     private fun setFieldText(source: AccessibilityNodeInfo, text: String): Boolean {
@@ -624,12 +634,17 @@ class AssistantService : AccessibilityService() {
         currentJob?.cancel()
         handler.removeCallbacksAndMessages(null)
         lastReplacedText = null
+        lastReplacedAt = 0L
         lastReplacedSource = null
         dismissOverlayToast()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isProcessing.set(false)
+        lastReplacedText = null
+        lastReplacedAt = 0L
+        lastReplacedSource = null
         handler.removeCallbacksAndMessages(null)
         dismissOverlayToast()
         serviceScope.cancel()
