@@ -111,7 +111,7 @@ fun KeysScreen() {
                 },
                 enabled = newKey.isNotBlank() && !isTesting,
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             ) {
                 Text(if (isTesting) stringResource(R.string.keys_testing) else stringResource(R.string.keys_add_key))
             }
@@ -134,9 +134,9 @@ fun KeysScreen() {
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     modifier = Modifier
-                        .padding(top = 8.dp)
                         .clickable { uriHandler.openUri(apiKeyUrl) }
-                        .padding(vertical = 8.dp)
+                        .heightIn(min = 48.dp)
+                        .wrapContentHeight(Alignment.CenterVertically)
                 )
             }
         }

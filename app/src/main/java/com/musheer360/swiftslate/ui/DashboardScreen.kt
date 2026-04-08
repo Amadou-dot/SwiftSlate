@@ -184,7 +184,8 @@ fun DashboardScreen() {
                         Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Musheer360/SwiftSlate"))
                     )
                 }
-                .padding(vertical = 8.dp)
+                .heightIn(min = 48.dp)
+                .wrapContentHeight(Alignment.CenterVertically)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
