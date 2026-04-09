@@ -32,6 +32,12 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5c8a8a642e79153f5d047b10ec1cba1d1cc65699 # v3.35.1
         with:
@@ -61,7 +67,7 @@ jobs:
       - name: Run mobsfscan
         uses: MobSF/mobsfscan@3d87bc570c4614d705547bddb521395663dba353 # 0.4.5
         with:
-          args: '. --sarif --output results.sarif || true'
+          args: '. --sarif --output results.sarif'
 
       - name: Upload mobsfscan SARIF
         if: always()

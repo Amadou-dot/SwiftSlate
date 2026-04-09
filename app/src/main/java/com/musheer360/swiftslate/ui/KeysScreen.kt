@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,7 +38,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val haptic = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
     var keys by remember { mutableStateOf(keyManager.getKeys()) }
-    var newKey by rememberSaveable { mutableStateOf("") }
+    var newKey by remember { mutableStateOf("") }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testSuccess by remember { mutableStateOf(false) }
@@ -165,7 +164,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(keys, key = { _, key -> key }) { index, key ->
+                    itemsIndexed(keys, key = { index, _ -> index }) { index, key ->
                         SlateItemCard {
                             Text(
                                 text = "••••••••" + key.takeLast(4),

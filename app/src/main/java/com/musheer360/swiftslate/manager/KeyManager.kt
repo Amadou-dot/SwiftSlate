@@ -152,6 +152,7 @@ class KeyManager(context: Context) {
         return saved
     }
 
+    @Synchronized
     fun getNextKey(): String? {
         val keys = getKeys()
         if (keys.isEmpty()) return null

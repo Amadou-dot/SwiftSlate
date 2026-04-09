@@ -74,6 +74,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
     var backupSuccess by remember { mutableStateOf(false) }
     var showImportConfirm by remember { mutableStateOf(false) }
     val exportSuccessMsg = stringResource(R.string.backup_export_success)
+    val exportErrorMsg = stringResource(R.string.backup_export_error)
     val importSuccessMsg = stringResource(R.string.backup_import_success)
     val importErrorMsg = stringResource(R.string.backup_import_error)
 
@@ -89,7 +90,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
                     backupMessage = exportSuccessMsg
                     backupSuccess = true
                 } catch (_: Exception) {
-                    backupMessage = importErrorMsg
+                    backupMessage = exportErrorMsg
                     backupSuccess = false
                 }
             }

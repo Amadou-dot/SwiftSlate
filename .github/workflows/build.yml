@@ -87,11 +87,13 @@ jobs:
         id: lint
         shell: bash
         run: |
+          result=1
           for i in 1 2 3; do
-            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && break
+            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
             echo "::warning::Lint attempt $i failed, retrying..."
             sleep 10
           done
+          exit $result
 
       - name: Upload lint results
         if: always()
@@ -124,11 +126,13 @@ jobs:
       - name: Run unit tests
         shell: bash
         run: |
+          result=1
           for i in 1 2 3; do
-            ./gradlew test --parallel --build-cache --no-daemon --configuration-cache-problems=warn && break
+            ./gradlew test --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
             echo "::warning::Test attempt $i failed, retrying..."
             sleep 10
           done
+          exit $result
 
       - name: Upload test results
         if: always()
@@ -161,20 +165,24 @@ jobs:
 
       - name: Decode signing keystore
         shell: bash
-        run: echo "$KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/release.keystore
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/release.keystore
+          chmod 600 ${{ github.workspace }}/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build Release APK
         shell: bash
         run: |
+          result=1
           for i in 1 2 3; do
             ./gradlew assembleRelease --parallel --build-cache --no-daemon --configuration-cache-problems=warn --stacktrace \
               -PversionCode=${{ needs.version.outputs.version_code }} \
-              -PversionName=${{ needs.version.outputs.version_name }} && break
+              -PversionName=${{ needs.version.outputs.version_name }} && { result=0; break; }
             echo "::warning::Build attempt $i failed, retrying..."
             sleep 15
           done
+          exit $result
         env:
           KEYSTORE_FILE: ${{ github.workspace }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

@@ -353,7 +353,6 @@ class AssistantService : AccessibilityService() {
             try {
                 val previousText = lastOriginalText
                 if (previousText == null) {
-                    replaceText(source, currentText)
                     performHapticFeedback(HapticFeedbackConstants.REJECT)
                     showToast("Nothing to undo")
                 } else {

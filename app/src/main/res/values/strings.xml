@@ -72,6 +72,7 @@
     <string name="backup_export">Export</string>
     <string name="backup_import">Import</string>
     <string name="backup_export_success">Commands exported successfully</string>
+    <string name="backup_export_error">Export failed</string>
     <string name="backup_import_success">Commands imported successfully</string>
     <string name="backup_import_error">Invalid backup file</string>
     <string name="backup_import_confirm">This will replace all your existing custom commands. Continue?</string>

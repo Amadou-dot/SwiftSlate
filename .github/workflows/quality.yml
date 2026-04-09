@@ -57,11 +57,13 @@ jobs:
       - name: Run Detekt
         shell: bash
         run: |
+          result=1
           for i in 1 2 3; do
-            ./gradlew detekt --parallel --build-cache --no-daemon --configuration-cache-problems=warn && break
+            ./gradlew detekt --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
             echo "::warning::Detekt attempt $i failed, retrying..."
             sleep 10
           done
+          exit $result
 
       - name: Upload Detekt SARIF
         if: always()
@@ -72,6 +74,7 @@ jobs:
 
   android-lint:
     name: Android Lint
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -93,11 +96,13 @@ jobs:
       - name: Run Android Lint
         shell: bash
         run: |
+          result=1
           for i in 1 2 3; do
-            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && break
+            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
             echo "::warning::Lint attempt $i failed, retrying..."
             sleep 10
           done
+          exit $result
 
       - name: Upload lint report
         if: always()
