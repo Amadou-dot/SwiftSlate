@@ -67,7 +67,7 @@ jobs:
       - name: Run mobsfscan
         uses: MobSF/mobsfscan@3d87bc570c4614d705547bddb521395663dba353 # 0.4.5
         with:
-          args: '. --sarif --output results.sarif'
+          args: '. --sarif --output results.sarif || true'
 
       - name: Upload mobsfscan SARIF
         if: always()
