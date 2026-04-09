@@ -15,7 +15,6 @@
     <string name="dashboard_how_to_use_title">So funktioniert\'s</string>
     <string name="dashboard_how_to_use_body">1. Aktiviere den Accessibility-Dienst.\n2. Füge mindestens einen API-Schlüssel hinzu.\n3. Tippe irgendwo in Android und beende mit einem Trigger wie \'%1$sfix\' oder \'%1$scasual\'.\n4. Warte einen Moment, bis der Text automatisch ersetzt wird!</string>
     <string name="dashboard_version">Version %1$s</string>
-    <string name="dashboard_github">GitHub ↗</string>
 
     <!-- Keys -->
     <string name="keys_title">API-Schlüssel</string>

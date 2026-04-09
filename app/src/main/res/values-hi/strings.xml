@@ -15,7 +15,6 @@
     <string name="dashboard_how_to_use_title">उपयोग कैसे करें</string>
     <string name="dashboard_how_to_use_body">1. एक्सेसिबिलिटी सेवा सक्रिय करें।\n2. कम से कम एक API कुंजी जोड़ें।\n3. Android में कहीं भी टाइप करें, अंत में \'%1$sfix\' या \'%1$scasual\' जैसा ट्रिगर लगाएँ।\n4. कुछ पल प्रतीक्षा करें और टेक्स्ट अपने आप बदल जाएगा!</string>
     <string name="dashboard_version">संस्करण %1$s</string>
-    <string name="dashboard_github">GitHub ↗</string>
 
     <!-- Keys -->
     <string name="keys_title">API कुंजियाँ</string>

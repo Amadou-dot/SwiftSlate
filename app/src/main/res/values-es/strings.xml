@@ -15,7 +15,6 @@
     <string name="dashboard_how_to_use_title">Cómo usar</string>
     <string name="dashboard_how_to_use_body">1. Activa el servicio de accesibilidad.\n2. Añade al menos una clave API.\n3. Escribe en cualquier lugar de Android, terminando con un comando como \'%1$sfix\' o \'%1$scasual\'.\n4. ¡Espera un momento y el texto se reemplazará automáticamente!</string>
     <string name="dashboard_version">Versión %1$s</string>
-    <string name="dashboard_github">GitHub ↗</string>
 
     <!-- Keys -->
     <string name="keys_title">Claves API</string>

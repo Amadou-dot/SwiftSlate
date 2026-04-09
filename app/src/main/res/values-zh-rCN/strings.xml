@@ -15,7 +15,6 @@
     <string name="dashboard_how_to_use_title">使用方法</string>
     <string name="dashboard_how_to_use_body">1. 启用无障碍服务。\n2. 至少添加一个 API 密钥。\n3. 在 Android 任意位置输入文字，以 \'%1$sfix\' 或 \'%1$scasual\' 等触发词结尾。\n4. 稍等片刻，文本将自动替换！</string>
     <string name="dashboard_version">版本 %1$s</string>
-    <string name="dashboard_github">GitHub ↗</string>
 
     <!-- Keys -->
     <string name="keys_title">API 密钥</string>
