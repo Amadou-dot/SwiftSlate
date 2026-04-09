@@ -74,4 +74,10 @@
     <string name="backup_export_success">Commandes exportées avec succès</string>
     <string name="backup_import_success">Commandes importées avec succès</string>
     <string name="backup_import_error">Fichier de sauvegarde invalide</string>
+    <string name="keys_keystore_error">Secure key storage is unavailable on this device. Keys cannot be saved.</string>
+    <string name="backup_import_confirm">This will replace all your existing custom commands. Continue?</string>
+    <string name="backup_import_cancel">Cancel</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="commands_collapse">Collapse</string>
+    <string name="commands_expand">Expand</string>
 </resources>
