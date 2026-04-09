@@ -25,7 +25,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import android.widget.Toast
+import com.musheer360.swiftslate.api.ApiError
+import com.musheer360.swiftslate.api.ApiException
 import com.musheer360.swiftslate.api.GeminiClient
+import com.musheer360.swiftslate.api.GenerateResult
 import com.musheer360.swiftslate.api.OpenAICompatibleClient
 import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.manager.KeyManager
@@ -61,6 +64,7 @@ class AssistantService : AccessibilityService() {
     private var cachedPrefix = CommandManager.DEFAULT_PREFIX
     private var cachedTranslatePrefix = ""
     private var currentJob: Job? = null
+    private var processingResetRunnable: Runnable? = null
     @Volatile
     private var lastOriginalText: String? = null
     @Volatile
@@ -86,7 +90,6 @@ class AssistantService : AccessibilityService() {
         const val DEFAULT_TEMPERATURE = 0.5
         const val PROCESSING_WATCHDOG_MS = 120_000L
         val SPINNER_FRAMES = arrayOf("◐", "◓", "◑", "◒")
-        private val RETRY_AFTER_REGEX = Regex("retry after (\\d+)s")
         const val TOAST_BACKGROUND_COLOR = 0xE6323232.toInt()
         const val TOAST_DURATION_MS = 3500L
         const val TOAST_BOTTOM_MARGIN_DP = 64
@@ -127,25 +130,50 @@ class AssistantService : AccessibilityService() {
         watchdogRunnable = null
     }
 
+    private fun cancelPendingProcessingReset() {
+        processingResetRunnable?.let { handler.removeCallbacks(it) }
+        processingResetRunnable = null
+    }
+
+    private fun scheduleProcessingReset() {
+        cancelPendingProcessingReset()
+        val runnable = Runnable { isProcessing.set(false) }
+        processingResetRunnable = runnable
+        if (!handler.postDelayed(runnable, 500)) {
+            isProcessing.set(false)
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return
         if (event.packageName?.toString() == packageName) return
 
         if (isProcessing.get()) return
         val source = event.source ?: return
-        if (source.isPassword) return
-        val text = source.text?.toString() ?: return
+        if (source.isPassword) {
+            source.recycle()
+            return
+        }
+        val text = source.text?.toString() ?: run {
+            source.recycle()
+            return
+        }
         if (text.isEmpty()) {
             verifyRunnable?.let { handler.removeCallbacks(it) }
             lastReplacedText = null
+            try { lastReplacedSource?.recycle() } catch (_: Exception) {}
             lastReplacedSource = null
+            source.recycle()
             return
         }
 
         // Skip events where text matches what we just replaced (prevents IME re-commit race)
         val replaced = lastReplacedText
         if (replaced != null && text == replaced &&
-            System.currentTimeMillis() - lastReplacedAt < 1000) return
+            System.currentTimeMillis() - lastReplacedAt < 1000) {
+            source.recycle()
+            return
+        }
 
         if (System.currentTimeMillis() - lastTriggerRefresh > TRIGGER_REFRESH_INTERVAL_MS) {
             updateTriggers()
@@ -154,19 +182,27 @@ class AssistantService : AccessibilityService() {
         val lastChar = text[text.length - 1]
         if (!triggerLastChars.contains(lastChar)) {
             if (!lastChar.isLetterOrDigit() || !text.contains(cachedTranslatePrefix)) {
+                source.recycle()
                 return
             }
         }
 
-        val command = commandManager.findCommand(text) ?: return
+        val command = commandManager.findCommand(text) ?: run {
+            source.recycle()
+            return
+        }
 
         val precedingText = text.substring(0, text.length - command.trigger.length)
         val cleanText = precedingText.trim()
 
         if (command.trigger.endsWith("undo") && command.isBuiltIn) {
-            if (!isProcessing.compareAndSet(false, true)) return
+            if (!isProcessing.compareAndSet(false, true)) {
+                source.recycle()
+                return
+            }
             processingStartedAt = System.currentTimeMillis()
             startWatchdog()
+            cancelPendingProcessingReset()
             currentJob?.cancel()
             handleUndo(source, cleanText)
             return
@@ -174,9 +210,13 @@ class AssistantService : AccessibilityService() {
 
         when (command.type) {
             CommandType.TEXT_REPLACER -> {
-                if (!isProcessing.compareAndSet(false, true)) return
+                if (!isProcessing.compareAndSet(false, true)) {
+                    source.recycle()
+                    return
+                }
                 processingStartedAt = System.currentTimeMillis()
                 startWatchdog()
+                cancelPendingProcessingReset()
                 currentJob?.cancel()
                 currentJob = serviceScope.launch {
                     try {
@@ -195,18 +235,23 @@ class AssistantService : AccessibilityService() {
                         withContext(NonCancellable + Dispatchers.Main) {
                             cancelWatchdog()
                             processingStartedAt = 0L
-                            if (!handler.postDelayed({ isProcessing.set(false) }, 500)) {
-                                isProcessing.set(false)
-                            }
+                            scheduleProcessingReset()
                         }
                     }
                 }
             }
             CommandType.AI -> {
-                if (cleanText.isEmpty()) return
-                if (!isProcessing.compareAndSet(false, true)) return
+                if (cleanText.isEmpty()) {
+                    source.recycle()
+                    return
+                }
+                if (!isProcessing.compareAndSet(false, true)) {
+                    source.recycle()
+                    return
+                }
                 processingStartedAt = System.currentTimeMillis()
                 startWatchdog()
+                cancelPendingProcessingReset()
                 currentJob?.cancel()
                 processCommand(source, cleanText, command)
             }
@@ -221,6 +266,7 @@ class AssistantService : AccessibilityService() {
             cancelWatchdog()
             processingStartedAt = 0L
             isProcessing.set(false)
+            source.recycle()
             return
         }
 
@@ -238,6 +284,7 @@ class AssistantService : AccessibilityService() {
                 cancelWatchdog()
                 processingStartedAt = 0L
                 isProcessing.set(false)
+                source.recycle()
                 return
             }
         } else if (providerType == "groq") {
@@ -283,10 +330,10 @@ class AssistantService : AccessibilityService() {
                             spinnerJob.cancel()
                             spinnerJob = null
                             lastOriginalText = originalText
-                            replaceText(source, result.getOrThrow())
+                            val generateResult = result.getOrThrow()
+                            replaceText(source, generateResult.text)
                             performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            if ((providerType == "gemini" && client.structuredOutputFailed) ||
-                                (providerType in setOf("custom", "groq") && openAIClient.structuredOutputFailed)) {
+                            if (generateResult.structuredOutputFailed) {
                                 prefs.edit().putLong("structured_output_disabled_at", System.currentTimeMillis()).apply()
                             }
                             succeeded = true
@@ -295,16 +342,17 @@ class AssistantService : AccessibilityService() {
 
                         val msg = result.exceptionOrNull()?.message ?: ""
                         lastErrorMsg = msg
-                        val isRateLimit = msg.contains("Rate limit") || msg.contains("rate limit")
-                        val isInvalidKey = msg.contains("Invalid API key", ignoreCase = true) || msg.contains("API key not valid", ignoreCase = true)
+                        val apiError = (result.exceptionOrNull() as? ApiException)?.apiError
 
-                        if (isRateLimit) {
-                            val seconds = RETRY_AFTER_REGEX.find(msg)?.groupValues?.get(1)?.toLongOrNull() ?: 60
-                            keyManager.reportRateLimit(key, seconds)
-                        } else if (isInvalidKey) {
-                            keyManager.markInvalid(key)
-                        } else {
-                            break // Non-retryable error, stop trying other keys
+                        when (apiError) {
+                            is ApiError.RateLimit -> {
+                                val seconds = apiError.retryAfterSeconds?.toLong() ?: 60
+                                keyManager.reportRateLimit(key, seconds)
+                            }
+                            is ApiError.InvalidKey -> {
+                                keyManager.markInvalid(key)
+                            }
+                            else -> break // Non-retryable error, stop trying other keys
                         }
                     }
 
@@ -345,9 +393,7 @@ class AssistantService : AccessibilityService() {
                     cancelWatchdog()
                     spinnerJob?.cancel()
                     processingStartedAt = 0L
-                    if (!handler.postDelayed({ isProcessing.set(false) }, 500)) {
-                        isProcessing.set(false)
-                    }
+                    scheduleProcessingReset()
                 }
             }
         }
@@ -373,9 +419,7 @@ class AssistantService : AccessibilityService() {
                 withContext(NonCancellable + Dispatchers.Main) {
                     cancelWatchdog()
                     processingStartedAt = 0L
-                    if (!handler.postDelayed({ isProcessing.set(false) }, 500)) {
-                        isProcessing.set(false)
-                    }
+                    scheduleProcessingReset()
                 }
             }
         }
@@ -432,12 +476,17 @@ class AssistantService : AccessibilityService() {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
                 }
             }
-        }, 500)
+        }, 150)
     }
 
     private fun scheduleTextVerification(source: AccessibilityNodeInfo, expectedText: String) {
         lastReplacedText = expectedText
         lastReplacedAt = System.currentTimeMillis()
+        // Recycle the previous source if it's a different node
+        val prev = lastReplacedSource
+        if (prev != null && prev !== source) {
+            try { prev.recycle() } catch (_: Exception) {}
+        }
         lastReplacedSource = source
         verifyRunnable?.let { handler.removeCallbacks(it) }
         val runnable = Runnable {
@@ -455,6 +504,7 @@ class AssistantService : AccessibilityService() {
             } catch (_: Exception) {
             } finally {
                 lastReplacedText = null
+                try { lastReplacedSource?.recycle() } catch (_: Exception) {}
                 lastReplacedSource = null
             }
         }
@@ -653,6 +703,7 @@ class AssistantService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         lastReplacedText = null
         lastReplacedAt = 0L
+        try { lastReplacedSource?.recycle() } catch (_: Exception) {}
         lastReplacedSource = null
         dismissOverlayToast()
     }
@@ -662,6 +713,7 @@ class AssistantService : AccessibilityService() {
         isProcessing.set(false)
         lastReplacedText = null
         lastReplacedAt = 0L
+        try { lastReplacedSource?.recycle() } catch (_: Exception) {}
         lastReplacedSource = null
         handler.removeCallbacksAndMessages(null)
         dismissOverlayToast()

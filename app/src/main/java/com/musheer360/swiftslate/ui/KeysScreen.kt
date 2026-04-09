@@ -38,6 +38,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val haptic = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
     var keys by remember { mutableStateOf(keyManager.getKeys()) }
+    var keyToDelete by remember { mutableStateOf<String?>(null) }
     var newKey by remember { mutableStateOf("") }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
@@ -176,12 +177,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    if (keyManager.removeKey(key)) {
-                                        keys = keyManager.getKeys()
-                                    } else {
-                                        testResult = keystoreErrorMsg
-                                        testSuccess = false
-                                    }
+                                    keyToDelete = key
                                 },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -201,5 +197,32 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    keyToDelete?.let { keyValue ->
+        AlertDialog(
+            onDismissRequest = { keyToDelete = null },
+            title = { Text(stringResource(R.string.delete_confirm_key_title)) },
+            text = { Text(stringResource(R.string.delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (keyManager.removeKey(keyValue)) {
+                        keys = keyManager.getKeys()
+                    } else {
+                        testResult = keystoreErrorMsg
+                        testSuccess = false
+                    }
+                    keyToDelete = null
+                }) {
+                    Text(stringResource(R.string.delete_confirm_button), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { keyToDelete = null }) {
+                    Text(stringResource(R.string.commands_cancel))
+                }
+            }
+        )
     }
 }

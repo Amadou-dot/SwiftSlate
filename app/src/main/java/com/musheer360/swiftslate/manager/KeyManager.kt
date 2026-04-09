@@ -81,9 +81,8 @@ class KeyManager(context: Context) {
     }
 
     private fun decrypt(encryptedString: String): String? {
-        // TODO(v1.2): Remove legacy plaintext fallback after migration period
         if (!encryptedString.contains(IV_SEPARATOR)) {
-            return encryptedString // legacy plaintext — backward compat
+            return null // corrupted or legacy plaintext — no longer supported
         }
         val parts = encryptedString.split(IV_SEPARATOR)
         if (parts.size != 2) return null
@@ -105,6 +104,20 @@ class KeyManager(context: Context) {
     fun getKeys(): List<String> {
         cachedKeys?.let { return it }
         val encryptedStr = prefs.getString(PREF_KEY_ARRAY, null) ?: return emptyList()
+        // Migrate legacy plaintext: if stored value has no IV separator, it's plaintext — re-encrypt it
+        if (!encryptedStr.contains(IV_SEPARATOR)) {
+            return try {
+                prefs.edit().putString(PREF_KEY_ARRAY, encrypt(encryptedStr)).apply()
+                // Re-read after migration
+                val reEncrypted = prefs.getString(PREF_KEY_ARRAY, null) ?: return emptyList()
+                val jsonStr = decrypt(reEncrypted) ?: return emptyList()
+                val list = mutableListOf<String>()
+                val arr = JSONArray(jsonStr)
+                for (i in 0 until arr.length()) { list.add(arr.getString(i)) }
+                cachedKeys = list
+                list
+            } catch (_: Exception) { emptyList() }
+        }
         val jsonStr = decrypt(encryptedStr) ?: return emptyList()
         val list = mutableListOf<String>()
         try {

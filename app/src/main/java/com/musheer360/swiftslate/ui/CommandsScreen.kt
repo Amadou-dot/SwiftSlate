@@ -53,6 +53,7 @@ fun CommandsScreen(commandManager: CommandManager) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedType by rememberSaveable { mutableStateOf(CommandType.AI) }
     var editingTrigger by rememberSaveable { mutableStateOf<String?>(null) }
+    var commandToDelete by remember { mutableStateOf<String?>(null) }
     var isFormExpanded by rememberSaveable { mutableStateOf(false) }
     val prefix = commandManager.getTriggerPrefix()
     val errorPrefixMsg = stringResource(R.string.commands_error_prefix, prefix)
@@ -315,16 +316,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 IconButton(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        commandManager.removeCustomCommand(cmd.trigger)
-                                        if (editingTrigger == cmd.trigger) {
-                                            trigger = ""
-                                            prompt = ""
-                                            errorMessage = null
-                                            editingTrigger = null
-                                            selectedType = CommandType.AI
-                                            isFormExpanded = false
-                                        }
-                                        commands = commandManager.getCommands()
+                                        commandToDelete = cmd.trigger
                                     },
                                     modifier = Modifier.size(36.dp)
                                 ) {
@@ -345,5 +337,36 @@ fun CommandsScreen(commandManager: CommandManager) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    commandToDelete?.let { triggerToDelete ->
+        AlertDialog(
+            onDismissRequest = { commandToDelete = null },
+            title = { Text(stringResource(R.string.delete_confirm_command_title)) },
+            text = { Text(stringResource(R.string.delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    commandManager.removeCustomCommand(triggerToDelete)
+                    if (editingTrigger == triggerToDelete) {
+                        trigger = ""
+                        prompt = ""
+                        errorMessage = null
+                        editingTrigger = null
+                        selectedType = CommandType.AI
+                        isFormExpanded = false
+                    }
+                    commands = commandManager.getCommands()
+                    commandToDelete = null
+                }) {
+                    Text(stringResource(R.string.delete_confirm_button), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { commandToDelete = null }) {
+                    Text(stringResource(R.string.commands_cancel))
+                }
+            }
+        )
     }
 }

@@ -4,8 +4,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 
 class OpenAICompatibleClient {
 
@@ -13,9 +16,6 @@ class OpenAICompatibleClient {
         private val HTTP_CODE_REGEX = Regex("^HTTP_(\\d+):")
         private val HTTP_PREFIX_REGEX = Regex("^HTTP_\\d+:\\s*")
     }
-
-    @Volatile
-    var structuredOutputFailed = false
 
     suspend fun validateKey(apiKey: String, endpoint: String): Result<String> = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
@@ -67,24 +67,33 @@ class OpenAICompatibleClient {
         endpoint: String,
         useStructuredOutput: Boolean = false,
         useJsonObjectMode: Boolean = false
-    ): Result<String> = withContext(Dispatchers.IO) {
-        structuredOutputFailed = false
+    ): Result<GenerateResult> = withContext(Dispatchers.IO) {
+        var soFailed = false
 
-        val result = doGenerate(prompt, text, apiKey, model, temperature, endpoint, useStructuredOutput, useJsonObjectMode)
+        var result = doGenerate(prompt, text, apiKey, model, temperature, endpoint, useStructuredOutput, useJsonObjectMode)
 
-        if (useStructuredOutput && result.isFailure) {
+        // Retry once for transient network errors
+        if (result.isFailure && result.exceptionOrNull().isTransientNetwork()) {
+            kotlinx.coroutines.delay(1000)
+            result = doGenerate(prompt, text, apiKey, model, temperature, endpoint, useStructuredOutput, useJsonObjectMode)
+        }
+
+        val finalResult = if (useStructuredOutput && result.isFailure) {
             val msg = result.exceptionOrNull()?.message ?: ""
             val code = HTTP_CODE_REGEX.find(msg)?.groupValues?.get(1)?.toIntOrNull()
             if (code == 400 || code == 422) {
                 val retry = doGenerate(prompt, text, apiKey, model, temperature, endpoint, false, false)
-                if (retry.isSuccess) {
-                    structuredOutputFailed = true
-                }
-                return@withContext stripHttpPrefix(retry)
+                if (retry.isSuccess) soFailed = true
+                stripHttpPrefix(retry.map { it.first })
+            } else {
+                stripHttpPrefix(result.map { it.first })
             }
+        } else {
+            if (result.isSuccess && result.getOrNull()?.second == true) soFailed = true
+            stripHttpPrefix(result.map { it.first })
         }
 
-        stripHttpPrefix(result)
+        finalResult.map { GenerateResult(it, soFailed) }
     }
 
     private fun stripHttpPrefix(result: Result<String>): Result<String> {
@@ -105,7 +114,7 @@ class OpenAICompatibleClient {
         endpoint: String,
         withStructured: Boolean,
         withJsonObject: Boolean = false
-    ): Result<String> {
+    ): Result<Pair<String, Boolean>> {
         var connection: HttpURLConnection? = null
         return try {
             val baseUrl = endpoint.trimEnd('/')
@@ -186,23 +195,27 @@ class OpenAICompatibleClient {
 
                     if (withStructured || withJsonObject) {
                         val (extracted, _) = ApiClientUtils.tryExtractStructuredText(resultText)
-                        if (extracted != null) return Result.success(extracted)
-                        if (withStructured) structuredOutputFailed = true
+                        if (extracted != null) return Result.success(Pair(extracted, false))
+                        if (withStructured) {
+                            resultText = ApiClientUtils.stripMarkdownFences(resultText)
+                            if (finishReason == "length") resultText += "\n\n[Note: Response may be truncated]"
+                            return Result.success(Pair(resultText, true))
+                        }
                     }
 
                     resultText = ApiClientUtils.stripMarkdownFences(resultText)
                     if (finishReason == "length") {
                         resultText += "\n\n[Note: Response may be truncated]"
                     }
-                    Result.success(resultText)
+                    Result.success(Pair(resultText, false))
                 } else {
                     Result.failure(Exception("No choices found in response"))
                 }
             } else if (responseCode == 429) {
                 val retryAfter = connection.getHeaderField("Retry-After")
-                val seconds = retryAfter?.toLongOrNull()
+                val seconds = retryAfter?.toIntOrNull()
                 val msg = if (seconds != null) "Rate limit exceeded, retry after ${seconds}s" else "Rate limit exceeded"
-                Result.failure(Exception(msg))
+                Result.failure(ApiException(ApiError.RateLimit(msg, seconds), msg))
             } else if (responseCode == 400 || responseCode == 422) {
                 val errorBody = ApiClientUtils.readErrorBody(connection)
                 val apiMessage = ApiClientUtils.extractApiErrorMessage(errorBody)
@@ -212,14 +225,20 @@ class OpenAICompatibleClient {
                 val errorBody = ApiClientUtils.readErrorBody(connection)
                 val apiMessage = ApiClientUtils.extractApiErrorMessage(errorBody)
                 val detail = if (apiMessage.isNotEmpty()) apiMessage else "Invalid API key"
-                Result.failure(Exception(detail))
+                Result.failure(ApiException(ApiError.InvalidKey(detail), detail))
             } else {
                 val errorBody = ApiClientUtils.readErrorBody(connection)
                 val detail = ApiClientUtils.sanitizeErrorForUser(responseCode, errorBody, "Unexpected error")
-                Result.failure(Exception(detail))
+                val apiError = if (responseCode in 500..599) ApiError.ServerError(detail) else ApiError.Other(detail)
+                Result.failure(ApiException(apiError, detail))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val apiError = when (e) {
+                is ApiException -> e.apiError
+                is SocketTimeoutException, is UnknownHostException, is ConnectException -> ApiError.Network(e.message ?: "Network error")
+                else -> ApiError.Other(e.message ?: "Unknown error")
+            }
+            if (e is ApiException) Result.failure(e) else Result.failure(ApiException(apiError, e.message ?: "Unknown error"))
         } finally {
             connection?.disconnect()
         }

@@ -73,6 +73,24 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var backupSuccess by remember { mutableStateOf(false) }
     var showImportConfirm by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            saveEndpointJob?.cancel()
+            saveModelJob?.cancel()
+            val editor = prefs.edit()
+            var needsWrite = false
+            if (customEndpoint != (prefs.getString("custom_endpoint", "") ?: "")) {
+                editor.putString("custom_endpoint", customEndpoint)
+                needsWrite = true
+            }
+            if (customModel != (prefs.getString("custom_model", "") ?: "")) {
+                editor.putString("custom_model", customModel)
+                needsWrite = true
+            }
+            if (needsWrite) editor.apply()
+        }
+    }
     val exportSuccessMsg = stringResource(R.string.backup_export_success)
     val exportErrorMsg = stringResource(R.string.backup_export_error)
     val importSuccessMsg = stringResource(R.string.backup_import_success)

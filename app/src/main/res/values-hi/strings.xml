@@ -79,5 +79,11 @@
     <string name="settings_check_updates">Check for updates</string>
     <string name="commands_collapse">Collapse</string>
     <string name="commands_expand">Expand</string>
+
+    <!-- Delete confirmation -->
+    <string name="delete_confirm_command_title">यह कमांड हटाएँ?</string>
+    <string name="delete_confirm_key_title">यह API कुंजी हटाएँ?</string>
+    <string name="delete_confirm_message">यह क्रिया पूर्ववत नहीं की जा सकती।</string>
+    <string name="delete_confirm_button">हटाएँ</string>
     <string name="backup_export_error">Export failed</string>
 </resources>

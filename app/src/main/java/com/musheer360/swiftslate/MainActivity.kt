@@ -16,9 +16,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -45,11 +47,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
-    object Keys : Screen("keys", "Keys", Icons.Default.Lock)
-    object Commands : Screen("commands", "Commands", Icons.AutoMirrored.Filled.List)
-    object Settings : Screen("settings", "Settings", Icons.Default.Settings)
+sealed class Screen(val route: String, @StringRes val titleRes: Int, val icon: ImageVector) {
+    object Dashboard : Screen("dashboard", R.string.dashboard_title, Icons.Default.Home)
+    object Keys : Screen("keys", R.string.keys_title, Icons.Default.Lock)
+    object Commands : Screen("commands", R.string.commands_title, Icons.AutoMirrored.Filled.List)
+    object Settings : Screen("settings", R.string.settings_title, Icons.Default.Settings)
 }
 
 @Composable
@@ -74,7 +76,7 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                         icon = {
                             Icon(
                                 screen.icon,
-                                contentDescription = screen.title
+                                contentDescription = stringResource(screen.titleRes)
                             )
                         },
                         label = null,

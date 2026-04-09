@@ -41,17 +41,19 @@ class CommandManager(context: Context) {
 
     @Synchronized fun setTriggerPrefix(newPrefix: String): Boolean {
         if (newPrefix.length != 1 || newPrefix[0].isLetterOrDigit() || newPrefix[0].isWhitespace()) return false
-        val oldPrefix = getTriggerPrefix()
-        if (oldPrefix == newPrefix) return true
-        // Migrate custom command triggers
+        // Write prefix first so crash between writes is self-healing on retry
+        settingsPrefs.edit().putString(PREF_TRIGGER_PREFIX, newPrefix).apply()
+        // Migrate custom command triggers — idempotent: always fix commands not matching current prefix
         val customStr = prefs.getString("custom_commands", "[]") ?: "[]"
         val arr = JSONArray(customStr)
         val newArr = JSONArray()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
             val oldTrigger = obj.getString("trigger")
-            val migrated = if (oldTrigger.startsWith(oldPrefix)) {
-                newPrefix + oldTrigger.removePrefix(oldPrefix)
+            val migrated = if (!oldTrigger.startsWith(newPrefix)) {
+                // Strip any single-char non-alphanumeric prefix, then apply new prefix
+                val stripped = if (oldTrigger.isNotEmpty() && !oldTrigger[0].isLetterOrDigit()) oldTrigger.substring(1) else oldTrigger
+                newPrefix + stripped
             } else oldTrigger
             val newObj = JSONObject()
             newObj.put("trigger", migrated)
@@ -59,11 +61,7 @@ class CommandManager(context: Context) {
             newObj.put("type", obj.optString("type", CommandType.AI.name))
             newArr.put(newObj)
         }
-        // Write commands first, then prefix. If process dies between the two:
-        // - Commands have new prefix, settings has old → built-ins use old prefix, custom use new.
-        //   Custom commands won't match until next setTriggerPrefix call. Acceptable degradation.
         prefs.edit().putString("custom_commands", newArr.toString()).apply()
-        settingsPrefs.edit().putString(PREF_TRIGGER_PREFIX, newPrefix).apply()
         cachedCommands = null
         return true
     }
