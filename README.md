@@ -21,7 +21,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 
 [![Latest Release](https://img.shields.io/github/v/release/Musheer360/SwiftSlate?style=flat-square&label=Latest&color=brightgreen)](https://github.com/Musheer360/SwiftSlate/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/Musheer360/SwiftSlate?style=flat-square&color=yellow)](https://github.com/Musheer360/SwiftSlate/stargazers)
-[![APK Size](https://img.shields.io/badge/APK_Size-~1.3_MB-blue?style=flat-square)](#)
+[![APK Size](https://img.shields.io/badge/APK_Size-~1.2_MB-blue?style=flat-square)](#)
 [![API 23+](https://img.shields.io/badge/Min_SDK-API_23-orange?style=flat-square)](#)
 [![Build](https://img.shields.io/github/actions/workflow/status/Musheer360/SwiftSlate/build.yml?branch=master&style=flat-square&label=CI)](https://github.com/Musheer360/SwiftSlate/actions/workflows/build.yml)
 
@@ -209,7 +209,7 @@ Beyond AI, you can create **text replacer commands** that run **entirely offline
 ### Installation
 
 > [!TIP]
-> The APK is only ~1.3 MB — lightweight with zero external dependencies for networking or JSON.
+> The APK is only ~1.2 MB — lightweight with zero external dependencies for networking or JSON.
 
 **1.** Download the latest APK from the [**Releases**](https://github.com/Musheer360/SwiftSlate/releases/latest) page
 
