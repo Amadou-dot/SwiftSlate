@@ -404,17 +404,12 @@ SwiftSlate has **four screens** accessible via the bottom navigation bar:
 
 ## 📸 Screenshots
 
-<!-- Add your screenshots here. Recommended: 4 screenshots side by side showing Dashboard, Keys, Commands, and Settings screens. -->
-<!-- Example:
 <div align="center">
-<img src="screenshots/dashboard.png" width="200" alt="Dashboard" />
-<img src="screenshots/keys.png" width="200" alt="Keys" />
-<img src="screenshots/commands.png" width="200" alt="Commands" />
+<img src="screenshots/dashboard.png" width="200" alt="Dashboard" />&nbsp;&nbsp;
+<img src="screenshots/keys.png" width="200" alt="API Keys" />&nbsp;&nbsp;
+<img src="screenshots/commands.png" width="200" alt="Commands" />&nbsp;&nbsp;
 <img src="screenshots/settings.png" width="200" alt="Settings" />
 </div>
--->
-
-*Screenshots coming soon — contributions welcome!*
 
 <br>
 
