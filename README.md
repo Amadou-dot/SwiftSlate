@@ -405,10 +405,21 @@ SwiftSlate has **four screens** accessible via the bottom navigation bar:
 ## 📸 Screenshots
 
 <div align="center">
-<img src="screenshots/dashboard.png" width="200" alt="Dashboard" />&nbsp;&nbsp;
-<img src="screenshots/keys.png" width="200" alt="API Keys" />&nbsp;&nbsp;
-<img src="screenshots/commands.png" width="200" alt="Commands" />&nbsp;&nbsp;
-<img src="screenshots/settings.png" width="200" alt="Settings" />
+
+**Dark Mode**
+
+<img src="screenshots/dashboard.png" width="200" alt="Dashboard — Dark" />&nbsp;&nbsp;
+<img src="screenshots/keys.png" width="200" alt="API Keys — Dark" />&nbsp;&nbsp;
+<img src="screenshots/commands.png" width="200" alt="Commands — Dark" />&nbsp;&nbsp;
+<img src="screenshots/settings.png" width="200" alt="Settings — Dark" />
+
+**Light Mode**
+
+<img src="screenshots/dashboard_light.png" width="200" alt="Dashboard — Light" />&nbsp;&nbsp;
+<img src="screenshots/keys_light.png" width="200" alt="API Keys — Light" />&nbsp;&nbsp;
+<img src="screenshots/commands_light.png" width="200" alt="Commands — Light" />&nbsp;&nbsp;
+<img src="screenshots/settings_light.png" width="200" alt="Settings — Light" />
+
 </div>
 
 <br>
