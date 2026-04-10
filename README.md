@@ -408,17 +408,29 @@ SwiftSlate has **four screens** accessible via the bottom navigation bar:
 
 **Dark Mode**
 
-<img src="screenshots/dashboard.png" width="200" alt="Dashboard — Dark" />&nbsp;&nbsp;
-<img src="screenshots/keys.png" width="200" alt="API Keys — Dark" />&nbsp;&nbsp;
-<img src="screenshots/commands.png" width="200" alt="Commands — Dark" />&nbsp;&nbsp;
-<img src="screenshots/settings.png" width="200" alt="Settings — Dark" />
+<table>
+<tr>
+<td><img src="screenshots/dashboard.png" width="280" alt="Dashboard — Dark" /></td>
+<td><img src="screenshots/keys.png" width="280" alt="API Keys — Dark" /></td>
+</tr>
+<tr>
+<td><img src="screenshots/commands.png" width="280" alt="Commands — Dark" /></td>
+<td><img src="screenshots/settings.png" width="280" alt="Settings — Dark" /></td>
+</tr>
+</table>
 
 **Light Mode**
 
-<img src="screenshots/dashboard_light.png" width="200" alt="Dashboard — Light" />&nbsp;&nbsp;
-<img src="screenshots/keys_light.png" width="200" alt="API Keys — Light" />&nbsp;&nbsp;
-<img src="screenshots/commands_light.png" width="200" alt="Commands — Light" />&nbsp;&nbsp;
-<img src="screenshots/settings_light.png" width="200" alt="Settings — Light" />
+<table>
+<tr>
+<td><img src="screenshots/dashboard_light.png" width="280" alt="Dashboard — Light" /></td>
+<td><img src="screenshots/keys_light.png" width="280" alt="API Keys — Light" /></td>
+</tr>
+<tr>
+<td><img src="screenshots/commands_light.png" width="280" alt="Commands — Light" /></td>
+<td><img src="screenshots/settings_light.png" width="280" alt="Settings — Light" /></td>
+</tr>
+</table>
 
 </div>
 
