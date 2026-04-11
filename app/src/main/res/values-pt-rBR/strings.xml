@@ -33,12 +33,12 @@
     <string name="commands_trigger_label">Gatilho (ex.: %1$scode)</string>
     <string name="commands_prompt_label">Instrução (ex.: Reescrever como poema)</string>
     <string name="commands_add_command">Adicionar comando</string>
-    <string name="commands_delete_command">Excluir comando</string>
-    <string name="commands_edit_command">Editar comando</string>
+    <string name="commands_delete_command">Excluir</string>
+    <string name="commands_edit_command">Editar</string>
     <string name="commands_save_command">Salvar comando</string>
     <string name="commands_cancel">Cancelar</string>
     <string name="commands_type_ai">IA</string>
-    <string name="commands_type_replacer">Substituidor de texto</string>
+    <string name="commands_type_replacer">Local</string>
     <string name="commands_replacement_label">Texto de substituição (ex.: myemail@example.com)</string>
     <string name="commands_built_in">Integrado</string>
     <string name="commands_error_prefix">O gatilho deve começar com \'%1$s\'</string>

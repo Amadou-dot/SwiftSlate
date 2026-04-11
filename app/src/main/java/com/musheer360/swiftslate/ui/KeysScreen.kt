@@ -167,10 +167,10 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        SectionHeader(stringResource(R.string.dashboard_api_keys_title))
         if (keys.isNotEmpty()) {
-            SectionHeader(stringResource(R.string.dashboard_api_keys_title))
             SlateCard {
                 LazyColumn(
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)),
@@ -204,10 +204,19 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                 }
             }
         } else {
-            Spacer(modifier = Modifier.weight(1f))
+            SlateCard(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.keys_empty),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
     }
 
     keyToDelete?.let { keyValue ->
@@ -231,7 +240,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
             },
             dismissButton = {
                 TextButton(onClick = { keyToDelete = null }) {
-                    Text(stringResource(R.string.commands_cancel))
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

@@ -33,12 +33,12 @@
     <string name="commands_trigger_label">Activador (p. ej., %1$scode)</string>
     <string name="commands_prompt_label">Instrucción (p. ej., Reescribir como poema)</string>
     <string name="commands_add_command">Añadir comando</string>
-    <string name="commands_delete_command">Eliminar comando</string>
-    <string name="commands_edit_command">Editar comando</string>
+    <string name="commands_delete_command">Eliminar</string>
+    <string name="commands_edit_command">Editar</string>
     <string name="commands_save_command">Guardar comando</string>
     <string name="commands_cancel">Cancelar</string>
     <string name="commands_type_ai">IA</string>
-    <string name="commands_type_replacer">Reemplazo de texto</string>
+    <string name="commands_type_replacer">Local</string>
     <string name="commands_replacement_label">Texto de reemplazo (p. ej., myemail@example.com)</string>
     <string name="commands_built_in">Integrado</string>
     <string name="commands_error_prefix">El activador debe comenzar con \'%1$s\'</string>

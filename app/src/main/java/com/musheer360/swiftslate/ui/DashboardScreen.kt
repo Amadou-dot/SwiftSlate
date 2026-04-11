@@ -127,6 +127,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager) {
                             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         },
                         shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.heightIn(min = 48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
@@ -161,14 +162,14 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager) {
             if (keyCount == 0) {
                 Text(
                     text = stringResource(R.string.dashboard_add_key_hint),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 6.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         SectionHeader(stringResource(R.string.dashboard_how_to_use_title))
         SlateCard {
@@ -180,6 +181,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager) {
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }

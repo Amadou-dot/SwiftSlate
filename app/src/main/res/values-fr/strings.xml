@@ -33,12 +33,12 @@
     <string name="commands_trigger_label">Déclencheur (ex. : %1$scode)</string>
     <string name="commands_prompt_label">Instruction (ex. : Réécrire sous forme de poème)</string>
     <string name="commands_add_command">Ajouter la commande</string>
-    <string name="commands_delete_command">Supprimer la commande</string>
-    <string name="commands_edit_command">Modifier la commande</string>
+    <string name="commands_delete_command">Supprimer</string>
+    <string name="commands_edit_command">Modifier</string>
     <string name="commands_save_command">Enregistrer la commande</string>
     <string name="commands_cancel">Annuler</string>
     <string name="commands_type_ai">IA</string>
-    <string name="commands_type_replacer">Remplacement de texte</string>
+    <string name="commands_type_replacer">Local</string>
     <string name="commands_replacement_label">Texte de remplacement (ex. : myemail@example.com)</string>
     <string name="commands_built_in">Intégré</string>
     <string name="commands_error_prefix">Le déclencheur doit commencer par \'%1$s\'</string>

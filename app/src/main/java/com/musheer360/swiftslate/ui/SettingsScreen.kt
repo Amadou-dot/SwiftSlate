@@ -318,7 +318,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
                         text = msg,
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
@@ -388,7 +388,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
                     text = msg,
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }
@@ -464,7 +464,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences) {
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
     if (showImportConfirm) {
