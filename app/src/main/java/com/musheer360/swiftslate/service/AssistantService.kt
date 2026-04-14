@@ -25,12 +25,18 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import android.widget.Toast
+import com.musheer360.swiftslate.api.ApiError
+import com.musheer360.swiftslate.api.ApiException
 import com.musheer360.swiftslate.api.GeminiClient
+import com.musheer360.swiftslate.api.GenerateResult
 import com.musheer360.swiftslate.api.OpenAICompatibleClient
 import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.manager.KeyManager
+import com.musheer360.swiftslate.manager.StatsManager
 import com.musheer360.swiftslate.manager.UndoManager
 import com.musheer360.swiftslate.model.Command
+import com.musheer360.swiftslate.model.CommandType
+import com.musheer360.swiftslate.model.ProviderType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +45,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -49,23 +57,34 @@ class AssistantService : AccessibilityService() {
 
     private lateinit var keyManager: KeyManager
     private lateinit var commandManager: CommandManager
+    private lateinit var statsManager: StatsManager
     private val client = GeminiClient()
     private val openAIClient = OpenAICompatibleClient()
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
-    @Volatile
-    private var isProcessing = false
+    private val isProcessing = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile
     private var processingStartedAt = 0L
     private val handler = Handler(Looper.getMainLooper())
     private var triggerLastChars = setOf<Char>()
     private var cachedPrefix = CommandManager.DEFAULT_PREFIX
+    private var cachedTranslatePrefix = ""
+    @Volatile
     private var currentJob: Job? = null
+    private var processingResetRunnable: Runnable? = null
     // Concurrency: access is serialized by the isProcessing guard + currentJob cancellation.
     private val undoManager = UndoManager()
+    @Volatile
+    private var lastReplacedText: String? = null
+    @Volatile
+    private var lastReplacedAt = 0L
+    @Volatile
+    private var lastReplacedSource: AccessibilityNodeInfo? = null
+    private var verifyRunnable: Runnable? = null
     private var lastTriggerRefresh = 0L
     private var currentOverlayToast: View? = null
     private var dismissRunnable: Runnable? = null
+    private var watchdogRunnable: Runnable? = null
     private var dismissAnimator: AnimatorSet? = null
     private var enterAnimator: AnimatorSet? = null
 
@@ -90,28 +109,84 @@ class AssistantService : AccessibilityService() {
         super.onServiceConnected()
         keyManager = KeyManager(applicationContext)
         commandManager = CommandManager(applicationContext)
+        statsManager = StatsManager(applicationContext)
         updateTriggers()
     }
 
     private fun updateTriggers() {
         cachedPrefix = commandManager.getTriggerPrefix()
+        cachedTranslatePrefix = "${cachedPrefix}translate:"
         val cmds = commandManager.getCommands()
         triggerLastChars = cmds.mapNotNull { it.trigger.lastOrNull() }.toSet()
         lastTriggerRefresh = System.currentTimeMillis()
     }
 
+    private fun startWatchdog() {
+        watchdogRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (isProcessing.get()) {
+                currentJob?.cancel()
+                isProcessing.set(false)
+                processingStartedAt = 0L
+            }
+        }
+        watchdogRunnable = runnable
+        handler.postDelayed(runnable, PROCESSING_WATCHDOG_MS)
+    }
+
+    private fun cancelWatchdog() {
+        watchdogRunnable?.let { handler.removeCallbacks(it) }
+        watchdogRunnable = null
+    }
+
+    private fun cancelPendingProcessingReset() {
+        processingResetRunnable?.let { handler.removeCallbacks(it) }
+        processingResetRunnable = null
+    }
+
+    private fun scheduleProcessingReset() {
+        cancelPendingProcessingReset()
+        val runnable = Runnable { isProcessing.set(false) }
+        processingResetRunnable = runnable
+        if (!handler.postDelayed(runnable, 500)) {
+            isProcessing.set(false)
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return
+        if (event.packageName?.toString() == packageName) return
+        if (!::keyManager.isInitialized) return
 
-        if (isProcessing && processingStartedAt > 0L &&
-            System.currentTimeMillis() - processingStartedAt > PROCESSING_WATCHDOG_MS) {
-            currentJob?.cancel()
+        if (isProcessing.get()) return
+        val source = event.source ?: return
+        if (source.isPassword) {
+            source.safeRecycle()
+            return
+        }
+        val text = source.text?.toString() ?: run {
+            source.safeRecycle()
+            return
+        }
+        if (text.isEmpty()) {
+            verifyRunnable?.let { handler.removeCallbacks(it) }
+            lastReplacedText = null
+            val prev = lastReplacedSource
+            lastReplacedSource = null
+            if (prev != null && prev !== source) {
+                prev.safeRecycle()
+            }
+            source.safeRecycle()
+            return
         }
 
-        if (isProcessing) return
-        val source = event.source ?: return
-        val text = source.text?.toString() ?: return
-        if (text.isEmpty()) return
+        // Skip events where text matches what we just replaced (prevents IME re-commit race)
+        val replaced = lastReplacedText
+        if (replaced != null && text == replaced &&
+            System.currentTimeMillis() - lastReplacedAt < 1000) {
+            source.safeRecycle()
+            return
+        }
 
         if (System.currentTimeMillis() - lastTriggerRefresh > TRIGGER_REFRESH_INTERVAL_MS) {
             updateTriggers()
@@ -119,57 +194,133 @@ class AssistantService : AccessibilityService() {
 
         val lastChar = text[text.length - 1]
         if (!triggerLastChars.contains(lastChar)) {
-            if (!lastChar.isLetterOrDigit() || !text.contains("${cachedPrefix}translate:")) {
+            if (!lastChar.isLetterOrDigit() || !text.contains(cachedTranslatePrefix)) {
+                source.safeRecycle()
                 return
             }
         }
 
-        val command = commandManager.findCommand(text) ?: return
+        val command = commandManager.findCommand(text) ?: run {
+            source.safeRecycle()
+            return
+        }
 
-        val cleanText = text.substring(0, text.length - command.trigger.length).trim()
+        val precedingText = text.substring(0, text.length - command.trigger.length)
+        val cleanText = precedingText.trim()
 
         if ((command.trigger.endsWith("undo") || command.trigger.endsWith("redo")) && command.isBuiltIn) {
-            if (source.isPassword) { return }
-            isProcessing = true
+            if (!isProcessing.compareAndSet(false, true)) {
+                source.safeRecycle()
+                return
+            }
             processingStartedAt = System.currentTimeMillis()
+            startWatchdog()
+            cancelPendingProcessingReset()
             currentJob?.cancel()
             val isRedo = command.trigger.endsWith("redo")
             handleUndoRedo(source, cleanText, isRedo)
             return
         }
 
-        if (cleanText.isEmpty() || source.isPassword) { return }
-
-        isProcessing = true
-        processingStartedAt = System.currentTimeMillis()
-        currentJob?.cancel()
-        processCommand(source, cleanText, command)
+        when (command.type) {
+            CommandType.TEXT_REPLACER -> {
+                if (!isProcessing.compareAndSet(false, true)) {
+                    source.safeRecycle()
+                    return
+                }
+                processingStartedAt = System.currentTimeMillis()
+                startWatchdog()
+                cancelPendingProcessingReset()
+                currentJob?.cancel()
+                currentJob = serviceScope.launch {
+                    val thisJob = coroutineContext[Job]
+                    try {
+                        withContext(Dispatchers.Main) {
+                            val fieldId = undoManager.fieldId(source)
+                            undoManager.pushState(fieldId, precedingText)
+                            replaceText(source, precedingText + command.prompt)
+                            performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            statsManager.recordUsage(command.trigger)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            showToast("Could not replace text")
+                        }
+                    } finally {
+                        withContext(NonCancellable + Dispatchers.Main) {
+                            if (currentJob === thisJob) {
+                                cancelWatchdog()
+                                processingStartedAt = 0L
+                                scheduleProcessingReset()
+                            }
+                            recycleIfUnowned(source)
+                        }
+                    }
+                }
+            }
+            CommandType.AI -> {
+                if (cleanText.isEmpty()) {
+                    source.safeRecycle()
+                    return
+                }
+                if (!isProcessing.compareAndSet(false, true)) {
+                    source.safeRecycle()
+                    return
+                }
+                processingStartedAt = System.currentTimeMillis()
+                startWatchdog()
+                cancelPendingProcessingReset()
+                currentJob?.cancel()
+                processCommand(source, cleanText, command)
+            }
+        }
     }
 
     private fun processCommand(source: AccessibilityNodeInfo, text: String, command: Command) {
-        val prefs = applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val providerType = prefs.getString("provider_type", "gemini") ?: "gemini"
-        val model: String
-        val endpoint: String
-
-        if (providerType == "custom") {
-            model = prefs.getString("custom_model", "") ?: ""
-            endpoint = prefs.getString("custom_endpoint", "") ?: ""
-            if (model.isBlank() || endpoint.isBlank()) {
-                serviceScope.launch {
-                    showToast("Custom provider not configured. Set endpoint and model in Settings.")
-                }
-                isProcessing = false
-                return
-            }
-        } else {
-            model = prefs.getString("model", "gemini-2.5-flash-lite") ?: "gemini-2.5-flash-lite"
-            endpoint = ""
+        if (!keyManager.keystoreAvailable) {
+            handler.post { Toast.makeText(applicationContext, "Secure key storage unavailable. Please reinstall the app.", Toast.LENGTH_LONG).show() }
+            cancelWatchdog()
+            processingStartedAt = 0L
+            isProcessing.set(false)
+            recycleIfUnowned(source)
+            return
         }
-        val temperature = DEFAULT_TEMPERATURE
-        val useStructuredOutput = !prefs.getBoolean("structured_output_disabled", false)
 
         currentJob = serviceScope.launch {
+            val thisJob = coroutineContext[Job]
+            val prefs = applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val providerType = ProviderType.sanitize(prefs.getString("provider_type", null))
+            val model: String
+            val endpoint: String
+
+            if (providerType == ProviderType.CUSTOM) {
+                model = prefs.getString("custom_model", "") ?: ""
+                endpoint = prefs.getString("custom_endpoint", "") ?: ""
+                if (model.isBlank() || endpoint.isBlank()) {
+                    showToast("Custom provider not configured. Set endpoint and model in Settings.")
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        cancelWatchdog()
+                        processingStartedAt = 0L
+                        scheduleProcessingReset()
+                        recycleIfUnowned(source)
+                    }
+                    return@launch
+                }
+            } else if (providerType == ProviderType.GROQ) {
+                model = prefs.getString("groq_model", "llama-3.3-70b-versatile") ?: "llama-3.3-70b-versatile"
+                endpoint = "https://api.groq.com/openai/v1"
+            } else {
+                model = prefs.getString("model", "gemini-2.5-flash-lite") ?: "gemini-2.5-flash-lite"
+                endpoint = ""
+            }
+            val temperature = prefs.getFloat("temperature", DEFAULT_TEMPERATURE.toFloat()).toDouble()
+            val useStructuredOutput = run {
+                val disabledAt = prefs.getLong("structured_output_disabled_at", 0L)
+                System.currentTimeMillis() - disabledAt > 86_400_000L // re-try after 24h
+            }
+
             val originalText = text
             var spinnerJob: Job? = null
             try {
@@ -186,54 +337,55 @@ class AssistantService : AccessibilityService() {
                             spinnerJob = startInlineSpinner(source, originalText)
                         }
 
-                        val result = if (providerType == "custom") {
-                            openAIClient.generate(command.prompt, text, key, model, temperature, endpoint, useStructuredOutput)
+                        val isGroq = providerType == ProviderType.GROQ
+                        val result = if (isGroq || providerType == ProviderType.CUSTOM) {
+                            openAIClient.generate(command.prompt, text, key, model, temperature, endpoint,
+                                useStructuredOutput = false,
+                                useJsonObjectMode = isGroq && useStructuredOutput)
                         } else {
                             client.generate(command.prompt, text, key, model, temperature, useStructuredOutput)
                         }
 
                         if (result.isSuccess) {
-                            spinnerJob?.cancel()
+                            spinnerJob?.cancelAndJoin()
                             spinnerJob = null
                             val fieldId = undoManager.fieldId(source)
                             undoManager.pushState(fieldId, originalText)
-                            replaceText(source, result.getOrThrow())
+                            val generateResult = result.getOrThrow()
+                            replaceText(source, generateResult.text)
                             performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            if (providerType == "custom") {
-                                if (openAIClient.structuredOutputFailed) {
-                                    prefs.edit().putBoolean("structured_output_disabled", true).apply()
-                                }
-                            } else {
-                                if (client.structuredOutputFailed) {
-                                    prefs.edit().putBoolean("structured_output_disabled", true).apply()
-                                }
+                            if (generateResult.structuredOutputFailed) {
+                                prefs.edit().putLong("structured_output_disabled_at", System.currentTimeMillis()).apply()
                             }
                             succeeded = true
+                            statsManager.recordUsage(command.trigger)
                             break
                         }
 
                         val msg = result.exceptionOrNull()?.message ?: ""
                         lastErrorMsg = msg
-                        val isRateLimit = msg.contains("Rate limit") || msg.contains("rate limit")
-                        val isInvalidKey = msg.contains("Invalid API key", ignoreCase = true) || msg.contains("API key not valid", ignoreCase = true)
+                        val apiError = (result.exceptionOrNull() as? ApiException)?.apiError
 
-                        if (isRateLimit) {
-                            val seconds = Regex("retry after (\\d+)s").find(msg)?.groupValues?.get(1)?.toLongOrNull() ?: 60
-                            keyManager.reportRateLimit(key, seconds)
-                        } else if (isInvalidKey) {
-                            keyManager.markInvalid(key)
-                        } else {
-                            break // Non-retryable error, stop trying other keys
+                        when (apiError) {
+                            is ApiError.RateLimit -> {
+                                val seconds = apiError.retryAfterSeconds?.toLong() ?: 60
+                                keyManager.reportRateLimit(key, seconds)
+                            }
+                            is ApiError.InvalidKey -> {
+                                keyManager.markInvalid(key)
+                            }
+                            is ApiError.ServerError -> continue // 5xx — try next key
+                            else -> break // Non-retryable error, stop trying other keys
                         }
                     }
 
                     if (!succeeded) {
-                        spinnerJob?.cancel()
+                        spinnerJob?.cancelAndJoin()
                         spinnerJob = null
                         replaceText(source, originalText)
                         performHapticFeedback(HapticFeedbackConstants.REJECT)
                         if (lastErrorMsg != null) {
-                            showToast("SwiftSlate Error: $lastErrorMsg")
+                            showToast(mapErrorMessage(lastErrorMsg))
                         } else {
                             val waitMs = keyManager.getShortestWaitTimeMs()
                             if (waitMs != null) {
@@ -248,24 +400,30 @@ class AssistantService : AccessibilityService() {
                     }
                 }
             } catch (e: TimeoutCancellationException) {
-                spinnerJob?.cancel()
+                spinnerJob?.cancelAndJoin()
                 try { replaceText(source, originalText) } catch (_: Exception) {}
                 showToast("Request timed out")
             } catch (e: CancellationException) {
+                withContext(NonCancellable + Dispatchers.Main) {
+                    spinnerJob?.cancel()
+                    try { replaceText(source, originalText) } catch (_: Exception) {}
+                }
                 throw e
             } catch (e: Exception) {
-                spinnerJob?.cancel()
+                spinnerJob?.cancelAndJoin()
                 try { replaceText(source, originalText) } catch (_: Exception) {
                     showToast("Could not restore original text")
                 }
-                showToast("SwiftSlate Error: ${e.message}")
+                showToast(mapErrorMessage(e.message ?: "Unknown error"))
             } finally {
                 withContext(NonCancellable + Dispatchers.Main) {
-                    spinnerJob?.cancel()
-                    processingStartedAt = 0L
-                    if (!handler.postDelayed({ isProcessing = false }, 500)) {
-                        isProcessing = false
+                    if (currentJob === thisJob) {
+                        cancelWatchdog()
+                        processingStartedAt = 0L
+                        scheduleProcessingReset()
                     }
+                    spinnerJob?.cancel()
+                    recycleIfUnowned(source)
                 }
             }
         }
@@ -273,6 +431,7 @@ class AssistantService : AccessibilityService() {
 
     private fun handleUndoRedo(source: AccessibilityNodeInfo, cleanText: String, isRedo: Boolean) {
         currentJob = serviceScope.launch {
+            val thisJob = coroutineContext[Job]
             try {
                 // Note: fieldId is derived from the live node. If the node is stale
                 // (user navigated away), the ID may not match the original entry,
@@ -299,58 +458,175 @@ class AssistantService : AccessibilityService() {
                 showToast(if (isRedo) "Could not redo" else "Could not undo")
             } finally {
                 withContext(NonCancellable + Dispatchers.Main) {
-                    processingStartedAt = 0L
-                    if (!handler.postDelayed({ isProcessing = false }, 500)) {
-                        isProcessing = false
+                    if (currentJob === thisJob) {
+                        cancelWatchdog()
+                        processingStartedAt = 0L
+                        scheduleProcessingReset()
                     }
+                    recycleIfUnowned(source)
                 }
             }
         }
     }
 
     private suspend fun replaceText(source: AccessibilityNodeInfo, newText: String) = withContext(Dispatchers.Main) {
-        source.refresh()
+        if (!source.refresh()) return@withContext
         val bundle = Bundle()
         bundle.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
 
         val success = source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
 
-        if (!success) {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val oldClip = clipboard.primaryClip
-            val newClip = ClipData.newPlainText("SwiftSlate Result", newText)
-            clipboard.setPrimaryClip(newClip)
+        if (success) {
+            // Verify the text actually persisted — some apps (Firefox, Google Keep)
+            // return true but don't update their internal text state
+            delay(100)
+            source.refresh()
+            val currentText = source.text?.toString()
+            if (currentText == newText) {
+                scheduleTextVerification(source, newText)
+                return@withContext // Text persisted
+            }
+            // Text didn't persist, fall through to clipboard fallback
+        }
 
-            val selectAllArgs = Bundle()
-            selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
-            selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, source.text?.length ?: 0)
-            source.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectAllArgs)
+        // Clipboard fallback: select all + paste (goes through app's input pipeline)
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val oldClip = clipboard.primaryClip
+        val newClip = ClipData.newPlainText("SwiftSlate Result", newText)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            newClip.description.extras = android.os.PersistableBundle().apply {
+                putBoolean("android.content.extra.IS_SENSITIVE", true)
+            }
+        }
+        clipboard.setPrimaryClip(newClip)
 
-            source.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        source.refresh()
+        if (source.text == null) return@withContext
+        val selectAllArgs = Bundle()
+        selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+        selectAllArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, source.text?.length ?: 0)
+        source.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectAllArgs)
 
-            handler.postDelayed({
-                if (oldClip != null) {
-                    clipboard.setPrimaryClip(oldClip)
+        source.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+
+        scheduleTextVerification(source, newText)
+
+        handler.postDelayed({
+            try {
+                source.refresh()
+                val fieldText = source.text?.toString()
+                if (fieldText == newText) {
+                    val current = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+                    if (current == newText) {
+                        if (oldClip != null) {
+                            clipboard.setPrimaryClip(oldClip)
+                        } else {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                        }
+                    }
                 }
-            }, 500)
+            } catch (_: Exception) {}
+        }, 500)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun AccessibilityNodeInfo.safeRecycle() {
+        try { recycle() } catch (_: Exception) {}
+    }
+
+    /** Recycle source only if scheduleTextVerification didn't take ownership. */
+    private fun recycleIfUnowned(source: AccessibilityNodeInfo) {
+        if (lastReplacedSource !== source) {
+            source.safeRecycle()
         }
     }
 
-    private fun setFieldText(source: AccessibilityNodeInfo, text: String) {
+    private fun scheduleTextVerification(source: AccessibilityNodeInfo, expectedText: String) {
+        lastReplacedText = expectedText
+        lastReplacedAt = System.currentTimeMillis()
+        // Recycle the previous source if it's a different node
+        val prev = lastReplacedSource
+        if (prev != null && prev !== source) {
+            prev.safeRecycle()
+        }
+        lastReplacedSource = source
+        verifyRunnable?.let { handler.removeCallbacks(it) }
+        val capturedSource = source
+        val runnable = Runnable {
+            try {
+                if (!capturedSource.refresh()) return@Runnable
+                val currentText = capturedSource.text?.toString()
+                val isImeClobber = currentText != null && currentText.isNotEmpty() && expectedText.startsWith(currentText)
+                if (isImeClobber && currentText != expectedText && currentText.length < expectedText.length) {
+                    val bundle = Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, expectedText)
+                    }
+                    capturedSource.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+                }
+            } catch (_: Exception) {
+            } finally {
+                // Only recycle if this source is still the current one (not replaced by a newer command)
+                if (lastReplacedSource === capturedSource) {
+                    lastReplacedText = null
+                    capturedSource.safeRecycle()
+                    lastReplacedSource = null
+                }
+            }
+        }
+        verifyRunnable = runnable
+        if (!handler.postDelayed(runnable, 300)) {
+            lastReplacedText = null
+            lastReplacedAt = 0L
+            lastReplacedSource = null
+        }
+    }
+
+    private fun setFieldText(source: AccessibilityNodeInfo, text: String): Boolean {
+        if (!source.refresh()) return false
         val bundle = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }
-        source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+        return source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
     }
 
     private fun startInlineSpinner(source: AccessibilityNodeInfo, baseText: String): Job {
         return serviceScope.launch(Dispatchers.Main) {
             var frameIndex = 0
             while (isActive) {
-                setFieldText(source, "$baseText ${SPINNER_FRAMES[frameIndex]}")
+                if (!setFieldText(source, "$baseText ${SPINNER_FRAMES[frameIndex]}")) break
                 frameIndex = (frameIndex + 1) % SPINNER_FRAMES.size
                 delay(200)
             }
+        }
+    }
+
+    private fun mapErrorMessage(raw: String): String {
+        val lower = raw.lowercase()
+        return when {
+            lower.contains("permission_denied") || lower.contains("permission denied") ->
+                "Your API key doesn't have access to this model."
+            lower.contains("invalid api key") || lower.contains("api key not valid") || lower.contains("api_key_invalid") ->
+                "Invalid API key. Please check your key in Settings."
+            lower.contains("rate limit") || lower.contains("resource_exhausted") || lower.contains("quota") ->
+                "Rate limited. Try again shortly."
+            lower.contains("model not found") || lower.contains("model_not_found") || lower.contains("not found for api version") ->
+                "Model not found. Check your model selection in Settings."
+            lower.contains("safety") || lower.contains("content_filter") || lower.contains("recitation") ||
+                lower.contains("blocked by safety") || lower.contains("finish_reason: safety") ||
+                lower.contains("failed_generation") ->
+                "Response blocked by safety filters. Try rephrasing."
+            lower.contains("empty response") || lower.contains("no content found") || lower.contains("no choices found") ->
+                "Model returned an empty response. Try again."
+            lower.contains("timeout") || lower.contains("timed out") ->
+                "Request timed out. Check your connection."
+            lower.contains("unable to resolve host") || lower.contains("no address associated") ||
+                lower.contains("network is unreachable") || lower.contains("no route to host") ->
+                "No internet connection."
+            lower.contains("connection refused") || lower.contains("connect failed") ->
+                "Could not reach the API. Check your endpoint URL."
+            lower.contains("bad request") ->
+                "Request failed. Check your settings."
+            else -> raw
         }
     }
 
@@ -487,13 +763,26 @@ class AssistantService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        isProcessing = false
+        isProcessing.set(false)
         processingStartedAt = 0L
         currentJob?.cancel()
+        serviceJob.cancelChildren()
+        handler.removeCallbacksAndMessages(null)
+        lastReplacedText = null
+        lastReplacedAt = 0L
+        lastReplacedSource?.safeRecycle()
+        lastReplacedSource = null
+        dismissOverlayToast()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isProcessing.set(false)
+        lastReplacedText = null
+        lastReplacedAt = 0L
+        lastReplacedSource?.safeRecycle()
+        lastReplacedSource = null
+        handler.removeCallbacksAndMessages(null)
         dismissOverlayToast()
         serviceScope.cancel()
     }
