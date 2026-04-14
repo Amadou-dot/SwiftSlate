@@ -143,7 +143,7 @@ class OpenAICompatibleClient {
                     })
                     put(JSONObject().apply {
                         put("role", "user")
-                        put("content", "---BEGIN TEXT---\n$text\n---END TEXT---")
+                        put("content", text)
                     })
                 })
                 put("temperature", temperature)

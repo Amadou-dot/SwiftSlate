@@ -24,10 +24,10 @@ class CommandManager(context: Context) {
 
     // Built-in command names (without prefix) and their prompts
     private val builtInDefinitions = listOf(
-        "fix" to "Fix all grammar, spelling, and punctuation errors.",
-        "improve" to "Improve the clarity and readability.",
-        "shorten" to "Shorten while preserving the core meaning.",
-        "expand" to "Expand with more detail and context.",
+        "fix" to "Fix grammar, spelling, and punctuation errors.",
+        "improve" to "Rewrite to improve clarity, flow, and coherence.",
+        "shorten" to "Rewrite to be more concise while preserving the core meaning.",
+        "expand" to "Rewrite with more detail. Elaborate only on what is stated or widely known \u2014 do not fabricate information.",
         "formal" to "Rewrite in a formal, professional tone.",
         "casual" to "Rewrite in a casual, friendly tone.",
         "emoji" to "Add relevant emojis throughout.",

@@ -38,6 +38,7 @@
     <string name="commands_built_in">Integriert</string>
     <string name="commands_error_prefix">Trigger muss mit \'%1$s\' beginnen</string>
     <string name="commands_error_duplicate">Ein Befehl mit diesem Trigger existiert bereits</string>
+    <string name="commands_error_conflict">Konflikt mit bestehendem Befehl \'%1$s\' — ein Trigger ist ein Präfix des anderen</string>
     <string name="commands_error_empty_trigger">Trigger muss einen Namen nach dem Präfix haben</string>
 
     <!-- Settings -->

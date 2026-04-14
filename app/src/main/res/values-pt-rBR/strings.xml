@@ -38,6 +38,7 @@
     <string name="commands_built_in">Integrado</string>
     <string name="commands_error_prefix">O gatilho deve começar com \'%1$s\'</string>
     <string name="commands_error_duplicate">Já existe um comando com este gatilho</string>
+    <string name="commands_error_conflict">Conflito com o comando existente \'%1$s\' — um gatilho é prefixo do outro</string>
     <string name="commands_error_empty_trigger">O gatilho deve ter um nome após o prefixo</string>
 
     <!-- Settings -->

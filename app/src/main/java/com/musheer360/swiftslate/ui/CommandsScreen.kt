@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -48,6 +49,7 @@ import com.musheer360.swiftslate.ui.components.SlateTextField
 @Composable
 fun CommandsScreen(commandManager: CommandManager) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     var commands by remember { mutableStateOf(commandManager.getCommands()) }
     val displayCommands = remember(commands) {
         val (builtIn, custom) = commands.partition { it.isBuiltIn }
@@ -428,6 +430,14 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 }
                                 if (commands.any { it.trigger == trimmedTrigger && it.trigger != editingTrigger }) {
                                     errorMessage = errorDuplicateMsg
+                                    return@Button
+                                }
+                                val conflicting = commands.firstOrNull {
+                                    it.trigger != editingTrigger &&
+                                    (it.trigger.startsWith(trimmedTrigger) || trimmedTrigger.startsWith(it.trigger))
+                                }
+                                if (conflicting != null) {
+                                    errorMessage = context.getString(R.string.commands_error_conflict, conflicting.trigger)
                                     return@Button
                                 }
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

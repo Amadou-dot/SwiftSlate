@@ -38,6 +38,7 @@
     <string name="commands_built_in">Integrado</string>
     <string name="commands_error_prefix">El activador debe comenzar con \'%1$s\'</string>
     <string name="commands_error_duplicate">Ya existe un comando con este activador</string>
+    <string name="commands_error_conflict">Conflicto con el comando existente \'%1$s\' — un activador es prefijo del otro</string>
     <string name="commands_error_empty_trigger">El activador debe tener un nombre después del prefijo</string>
 
     <!-- Settings -->

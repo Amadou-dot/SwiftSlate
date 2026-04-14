@@ -38,6 +38,7 @@
     <string name="commands_built_in">内置</string>
     <string name="commands_error_prefix">触发词必须以 \'%1$s\' 开头</string>
     <string name="commands_error_duplicate">已存在使用此触发词的命令</string>
+    <string name="commands_error_conflict">与现有命令 \'%1$s\' 冲突——一个触发词是另一个的前缀</string>
     <string name="commands_error_empty_trigger">前缀后必须有触发词名称</string>
 
     <!-- Settings -->

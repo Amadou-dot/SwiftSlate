@@ -167,11 +167,11 @@ class AssistantService : AccessibilityService() {
         if (isProcessing.get()) return
         val source = event.source ?: return
         if (source.isPassword) {
-            source.recycle()
+            source.safeRecycle()
             return
         }
         val text = source.text?.toString() ?: run {
-            source.recycle()
+            source.safeRecycle()
             return
         }
         if (text.isEmpty()) {
@@ -180,9 +180,9 @@ class AssistantService : AccessibilityService() {
             val prev = lastReplacedSource
             lastReplacedSource = null
             if (prev != null && prev !== source) {
-                try { prev.recycle() } catch (_: Exception) {}
+                prev.safeRecycle()
             }
-            source.recycle()
+            source.safeRecycle()
             return
         }
 
@@ -190,7 +190,7 @@ class AssistantService : AccessibilityService() {
         val replaced = lastReplacedText
         if (replaced != null && text == replaced &&
             System.currentTimeMillis() - lastReplacedAt < 1000) {
-            source.recycle()
+            source.safeRecycle()
             return
         }
 
@@ -201,13 +201,13 @@ class AssistantService : AccessibilityService() {
         val lastChar = text[text.length - 1]
         if (!triggerLastChars.contains(lastChar)) {
             if (!lastChar.isLetterOrDigit() || !text.contains(cachedTranslatePrefix)) {
-                source.recycle()
+                source.safeRecycle()
                 return
             }
         }
 
         val command = commandManager.findCommand(text) ?: run {
-            source.recycle()
+            source.safeRecycle()
             return
         }
 
@@ -216,7 +216,7 @@ class AssistantService : AccessibilityService() {
 
         if (command.trigger.endsWith("undo") && command.isBuiltIn) {
             if (!isProcessing.compareAndSet(false, true)) {
-                source.recycle()
+                source.safeRecycle()
                 return
             }
             processingStartedAt = System.currentTimeMillis()
@@ -230,7 +230,7 @@ class AssistantService : AccessibilityService() {
         when (command.type) {
             CommandType.TEXT_REPLACER -> {
                 if (!isProcessing.compareAndSet(false, true)) {
-                    source.recycle()
+                    source.safeRecycle()
                     return
                 }
                 processingStartedAt = System.currentTimeMillis()
@@ -267,11 +267,11 @@ class AssistantService : AccessibilityService() {
             }
             CommandType.AI -> {
                 if (cleanText.isEmpty()) {
-                    source.recycle()
+                    source.safeRecycle()
                     return
                 }
                 if (!isProcessing.compareAndSet(false, true)) {
-                    source.recycle()
+                    source.safeRecycle()
                     return
                 }
                 processingStartedAt = System.currentTimeMillis()
@@ -525,10 +525,15 @@ class AssistantService : AccessibilityService() {
         }, 500)
     }
 
+    @Suppress("DEPRECATION")
+    private fun AccessibilityNodeInfo.safeRecycle() {
+        try { recycle() } catch (_: Exception) {}
+    }
+
     /** Recycle source only if scheduleTextVerification didn't take ownership. */
     private fun recycleIfUnowned(source: AccessibilityNodeInfo) {
         if (lastReplacedSource !== source) {
-            try { source.recycle() } catch (_: Exception) {}
+            source.safeRecycle()
         }
     }
 
@@ -538,7 +543,7 @@ class AssistantService : AccessibilityService() {
         // Recycle the previous source if it's a different node
         val prev = lastReplacedSource
         if (prev != null && prev !== source) {
-            try { prev.recycle() } catch (_: Exception) {}
+            prev.safeRecycle()
         }
         lastReplacedSource = source
         verifyRunnable?.let { handler.removeCallbacks(it) }
@@ -548,7 +553,7 @@ class AssistantService : AccessibilityService() {
                 if (!capturedSource.refresh()) return@Runnable
                 val currentText = capturedSource.text?.toString()
                 val isImeClobber = currentText != null && currentText.isNotEmpty() && expectedText.startsWith(currentText)
-                if (isImeClobber && currentText != expectedText && currentText!!.length < expectedText.length) {
+                if (isImeClobber && currentText != expectedText && currentText.length < expectedText.length) {
                     val bundle = Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, expectedText)
                     }
@@ -559,7 +564,7 @@ class AssistantService : AccessibilityService() {
                 // Only recycle if this source is still the current one (not replaced by a newer command)
                 if (lastReplacedSource === capturedSource) {
                     lastReplacedText = null
-                    try { capturedSource.recycle() } catch (_: Exception) {}
+                    capturedSource.safeRecycle()
                     lastReplacedSource = null
                 }
             }
@@ -603,7 +608,8 @@ class AssistantService : AccessibilityService() {
             lower.contains("model not found") || lower.contains("model_not_found") || lower.contains("not found for api version") ->
                 "Model not found. Check your model selection in Settings."
             lower.contains("safety") || lower.contains("content_filter") || lower.contains("recitation") ||
-                lower.contains("blocked by safety") || lower.contains("finish_reason: safety") ->
+                lower.contains("blocked by safety") || lower.contains("finish_reason: safety") ||
+                lower.contains("failed_generation") ->
                 "Response blocked by safety filters. Try rephrasing."
             lower.contains("empty response") || lower.contains("no content found") || lower.contains("no choices found") ->
                 "Model returned an empty response. Try again."
@@ -760,7 +766,7 @@ class AssistantService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         lastReplacedText = null
         lastReplacedAt = 0L
-        try { lastReplacedSource?.recycle() } catch (_: Exception) {}
+        lastReplacedSource?.safeRecycle()
         lastReplacedSource = null
         dismissOverlayToast()
     }
@@ -770,7 +776,7 @@ class AssistantService : AccessibilityService() {
         isProcessing.set(false)
         lastReplacedText = null
         lastReplacedAt = 0L
-        try { lastReplacedSource?.recycle() } catch (_: Exception) {}
+        lastReplacedSource?.safeRecycle()
         lastReplacedSource = null
         handler.removeCallbacksAndMessages(null)
         dismissOverlayToast()

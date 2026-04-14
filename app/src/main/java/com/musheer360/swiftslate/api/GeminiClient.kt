@@ -134,10 +134,18 @@ class GeminiClient {
                     put(JSONObject().apply {
                         put("parts", JSONArray().apply {
                             put(JSONObject().apply {
-                                put("text", "---BEGIN TEXT---\n$text\n---END TEXT---")
+                                put("text", text)
                             })
                         })
                     })
+                })
+                put("safetySettings", JSONArray().apply {
+                    for (cat in arrayOf("HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_CIVIC_INTEGRITY")) {
+                        put(JSONObject().apply {
+                            put("category", cat)
+                            put("threshold", "BLOCK_NONE")
+                        })
+                    }
                 })
                 put("generationConfig", JSONObject().apply {
                     put("temperature", temperature)

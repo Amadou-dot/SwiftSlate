@@ -38,6 +38,7 @@
     <string name="commands_built_in">बिल्ट-इन</string>
     <string name="commands_error_prefix">ट्रिगर \'%1$s\' से शुरू होना चाहिए</string>
     <string name="commands_error_duplicate">इस ट्रिगर वाला कमांड पहले से मौजूद है</string>
+    <string name="commands_error_conflict">मौजूदा कमांड \'%1$s\' से विरोध — एक ट्रिगर दूसरे का प्रीफ़िक्स है</string>
     <string name="commands_error_empty_trigger">प्रीफ़िक्स के बाद ट्रिगर का नाम होना चाहिए</string>
 
     <!-- Settings -->

@@ -38,6 +38,7 @@
     <string name="commands_built_in">Intégré</string>
     <string name="commands_error_prefix">Le déclencheur doit commencer par \'%1$s\'</string>
     <string name="commands_error_duplicate">Une commande avec ce déclencheur existe déjà</string>
+    <string name="commands_error_conflict">Conflit avec la commande existante \'%1$s\' — un déclencheur est un préfixe de l\'autre</string>
     <string name="commands_error_empty_trigger">Le déclencheur doit avoir un nom après le préfixe</string>
 
     <!-- Settings -->
